@@ -9,6 +9,7 @@ using UnityEngine;
 using UnityEditor;
 using System;
 using System.Threading;
+using UnityEngine.Profiling.Memory.Experimental;
 
 namespace HeapExplorer
 {
@@ -784,6 +785,16 @@ namespace HeapExplorer
             ActivateView(null);
         }
 
+        /// <summary>
+        /// Same flags as Unity memory profiler.
+        /// </summary>
+        const CaptureFlags CAPTURE_FLAGS =
+            CaptureFlags.ManagedObjects
+            | CaptureFlags.NativeObjects
+            | CaptureFlags.NativeAllocations
+            | CaptureFlags.NativeAllocationSites
+            | CaptureFlags.NativeStackTraces;
+
         void CaptureAndSaveHeap()
         {
             if (string.IsNullOrEmpty(autoSavePath))
@@ -801,7 +812,7 @@ namespace HeapExplorer
                 m_IsCapturing = true;
 
                 string snapshotPath = System.IO.Path.ChangeExtension(path, "snapshot");
-                UnityEngine.Profiling.Memory.Experimental.MemoryProfiler.TakeSnapshot(snapshotPath, OnHeapReceivedSaveOnly);
+                MemoryProfiler.TakeSnapshot(snapshotPath, OnHeapReceivedSaveOnly, CAPTURE_FLAGS);
             }
             finally
             {
@@ -847,7 +858,7 @@ namespace HeapExplorer
                 m_IsCapturing = true;
 
                 var path = FileUtil.GetUniqueTempPathInProject();
-                UnityEngine.Profiling.Memory.Experimental.MemoryProfiler.TakeSnapshot(path, OnHeapReceived);
+                MemoryProfiler.TakeSnapshot(path, OnHeapReceived, CAPTURE_FLAGS);
             }
             finally
             {

@@ -19,12 +19,12 @@ namespace HeapExplorer
         struct Entry
         {
             public int typeIndex;
-            public long size;
+            public ulong size;
         }
         Entry[] m_NativeMemory;
         Entry[] m_ManagedMemory;
         Entry[] m_StaticMemory;
-        long m_NativeMemoryTotal;
+        ulong m_NativeMemoryTotal;
         long m_ManagedMemoryTotal;
         long m_StaticMemoryTotal;
         Texture2D m_HeapFragTexture;
@@ -120,7 +120,7 @@ namespace HeapExplorer
                 if (type.staticFieldBytes != null)
                 {
                     m_StaticMemoryTotal += type.staticFieldBytes.Length;
-                    m_StaticMemory[type.managedTypesArrayIndex].size += type.staticFieldBytes.Length;
+                    m_StaticMemory[type.managedTypesArrayIndex].size += type.staticFieldBytes.Length.ToUIntClamped();
                 }
 
                 m_StaticMemory[type.managedTypesArrayIndex].typeIndex = type.managedTypesArrayIndex;
@@ -168,7 +168,7 @@ namespace HeapExplorer
                         using (new EditorGUILayout.HorizontalScope())
                         {
                             GUILayout.Label(string.Format("{0:F2}%", (size / (float)m_NativeMemoryTotal) * 100), GUILayout.Width(k_ColumnPercentageWidth));
-                            GUILayout.Label(EditorUtility.FormatBytes(size), GUILayout.Width(k_ColumnSizeWidth));
+                            GUILayout.Label(EditorUtility.FormatBytes(size.ToLongClamped()), GUILayout.Width(k_ColumnSizeWidth));
                             HeEditorGUI.TypeName(GUILayoutUtility.GetRect(10, GUI.skin.label.CalcHeight(new GUIContent("Wg"), 32), GUILayout.ExpandWidth(true)), type.name);
                         }
                     }
@@ -182,7 +182,7 @@ namespace HeapExplorer
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         GUILayout.Label("Total", GUILayout.Width(k_ColumnPercentageWidth));
-                        GUILayout.Label(EditorUtility.FormatBytes(m_NativeMemoryTotal), EditorStyles.boldLabel, GUILayout.Width(k_ColumnSizeWidth));
+                        GUILayout.Label(EditorUtility.FormatBytes(m_NativeMemoryTotal.ToLongClamped()), EditorStyles.boldLabel, GUILayout.Width(k_ColumnSizeWidth));
                         if (GUILayout.Button("Investigate"))
                             window.OnGoto(new GotoCommand(new RichNativeObject(snapshot, 0)));
                     }
@@ -202,7 +202,7 @@ namespace HeapExplorer
                         using (new EditorGUILayout.HorizontalScope())
                         {
                             GUILayout.Label(string.Format("{0:F2}%", (size / (float)m_ManagedMemoryTotal) * 100), GUILayout.Width(k_ColumnPercentageWidth));
-                            GUILayout.Label(EditorUtility.FormatBytes(size), GUILayout.Width(k_ColumnSizeWidth));
+                            GUILayout.Label(EditorUtility.FormatBytes(size.ToLongClamped()), GUILayout.Width(k_ColumnSizeWidth));
                             HeEditorGUI.TypeName(GUILayoutUtility.GetRect(10, GUI.skin.label.CalcHeight(new GUIContent("Wg"), 32), GUILayout.ExpandWidth(true)), type.name);
                         }
                     }
@@ -236,7 +236,7 @@ namespace HeapExplorer
                         using (new EditorGUILayout.HorizontalScope())
                         {
                             GUILayout.Label(string.Format("{0:F2}%", (size / (float)m_StaticMemoryTotal) * 100), GUILayout.Width(k_ColumnPercentageWidth));
-                            GUILayout.Label(EditorUtility.FormatBytes(size), GUILayout.Width(k_ColumnSizeWidth));
+                            GUILayout.Label(EditorUtility.FormatBytes(size.ToLongClamped()), GUILayout.Width(k_ColumnSizeWidth));
                             HeEditorGUI.TypeName(GUILayoutUtility.GetRect(10, GUI.skin.label.CalcHeight(new GUIContent("Wg"), 32), GUILayout.ExpandWidth(true)), type.name);
                         }
                     }

@@ -156,7 +156,7 @@ namespace HeapExplorer
             }
         }
 
-        public int size
+        public ulong size
         {
             get
             {

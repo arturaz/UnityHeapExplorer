@@ -36,7 +36,6 @@ namespace HeapExplorer
         IList<int> m_Expanded = new List<int>(32);
         TreeViewItem m_Tree;
         string[] m_SearchCache = new string[32];
-        System.Text.StringBuilder m_SearchBuilder = new System.Text.StringBuilder();
 
         public AbstractTreeView(HeapExplorerWindow window, string editorPrefsKey, TreeViewState state)
             : base(state)
@@ -301,23 +300,37 @@ namespace HeapExplorer
             var i = item as AbstractTreeViewItem;
             if (i != null)
             {
-                int searchCount;
-                string type;
-                string label;
-                i.GetItemSearchString(m_SearchCache, out searchCount, out type, out label);
+                if (i.m_MaybeCachedItemSearchString == null) {
+                    int searchCount;
+                    string type;
+                    string label;
+                    i.GetItemSearchString(m_SearchCache, out searchCount, out type, out label);
 
-                if (!m_Search.IsTypeMatch(type) || !m_Search.IsLabelMatch(label))
-                    return false;
+                    var names = new List<string>(capacity: searchCount);
+                    for (var n=0; n < searchCount; ++n) 
+                    {
+                        var str = m_SearchCache[n];
+                        if (!string.IsNullOrEmpty(str)) names.Add(str.ToLowerInvariant());
+                    }
 
-                m_SearchBuilder.Length = 0;
-                for (var n=0; n < searchCount; ++n)
-                {
-                    m_SearchBuilder.Append(m_SearchCache[n]);
-                    m_SearchBuilder.Append(" ");
+                    i.m_MaybeCachedItemSearchString = new AbstractTreeViewItem.Cache(
+                        lowerCasedNames: names.ToArray(), type: type, label: label
+                    );
                 }
-                m_SearchBuilder.Append("\0");
 
-                return m_Search.IsNameMatch(m_SearchBuilder.ToString());
+                var searchString = i.m_MaybeCachedItemSearchString;
+
+                if (!m_Search.IsTypeMatch(searchString.type) || !m_Search.IsLabelMatch(searchString.label)) {
+                    return false;
+                }
+                else {
+                    // ReSharper disable once LoopCanBeConvertedToQuery
+                    foreach (var lowerCasedName in searchString.lowerCasedNames) {
+                        if (m_Search.IsNameMatch(lowerCasedName)) return true;
+                    }
+
+                    return false;
+                }
             }
 
             return base.DoesItemMatchSearch(item, search);
@@ -461,7 +474,34 @@ namespace HeapExplorer
             label = null;
         }
 
+        /// <summary>
+        /// Results of <see cref="GetItemSearchString"/> are cached here to avoid re-computation. If this is `null`,
+        /// invoke the <see cref="GetItemSearchString"/> and store the result here.
+        /// </summary>
+        public Cache m_MaybeCachedItemSearchString;
+
         public abstract void OnGUI(Rect position, int column);
+
+        public sealed class Cache {
+            /// <summary>
+            /// Parameters for <see cref="SearchTextParser.Result.IsNameMatch"/>.
+            /// <para/>
+            /// The search will match if any of these matches.
+            /// </summary>
+            public readonly string[] lowerCasedNames;
+            
+            /// <summary>Parameter for <see cref="SearchTextParser.Result.IsTypeMatch"/>.</summary>
+            public readonly string type;
+            
+            /// <summary>Parameter for <see cref="SearchTextParser.Result.IsLabelMatch"/>.</summary>
+            public readonly string label;
+
+            public Cache(string[] lowerCasedNames, string type, string label) {
+                this.lowerCasedNames = lowerCasedNames;
+                this.type = type;
+                this.label = label;
+            } 
+        } 
     }
 
     public static class TreeViewUtility

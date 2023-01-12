@@ -12,7 +12,7 @@ namespace HeapExplorer
 {
     [Serializable]
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
-    public struct PackedNativeType
+    public struct PackedNativeType : PackedMemorySnapshot.TypeForSubclassSearch
     {
         // The index used to obtain the native C++ base class description from the PackedMemorySnapshot.nativeTypes array.
         public System.Int32 nativeBaseTypeArrayIndex;
@@ -29,10 +29,25 @@ namespace HeapExplorer
 
         // The size of all objects of this type.
         [NonSerialized]
-        public System.Int64 totalObjectSize;
+        public ulong totalObjectSize;
 
         // Name of this C++ unity type.
         public System.String name;
+
+        /// <inheritdoc/>
+        string PackedMemorySnapshot.TypeForSubclassSearch.name {
+            get { return name; }
+        }
+
+        /// <inheritdoc/>
+        int PackedMemorySnapshot.TypeForSubclassSearch.typeArrayIndex {
+            get { return nativeTypeArrayIndex; }
+        }
+
+        /// <inheritdoc/>
+        int PackedMemorySnapshot.TypeForSubclassSearch.baseTypeArrayIndex {
+            get { return nativeBaseTypeArrayIndex; }
+        }
 
         const System.Int32 k_Version = 1;
 

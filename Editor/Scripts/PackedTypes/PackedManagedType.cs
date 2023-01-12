@@ -14,7 +14,7 @@ namespace HeapExplorer
     // Description of a managed type.
     [Serializable]
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
-    public struct PackedManagedType
+    public struct PackedManagedType : PackedMemorySnapshot.TypeForSubclassSearch
     {
         public static readonly PackedManagedType invalid = new PackedManagedType
         {
@@ -41,7 +41,10 @@ namespace HeapExplorer
         // An array containing descriptions of all fields of this type.
         public PackedManagedField[] fields;
 
-        // The actual contents of the bytes that store this types static fields, at the point of time when the snapshot was taken.
+        /// <summary>
+        /// The actual contents of the bytes that store this types static fields, at the point of time when the
+        /// snapshot was taken.
+        /// </summary>
         public System.Byte[] staticFieldBytes;
 
         // The base type for this type, pointed to by an index into PackedMemorySnapshot.typeDescriptions.
@@ -67,7 +70,7 @@ namespace HeapExplorer
 
         // The size of all objects of this type.
         [NonSerialized]
-        public System.Int64 totalObjectSize;
+        public ulong totalObjectSize;
 
         // gets whether the type derived from UnityEngine.Object
         [NonSerialized]
@@ -81,6 +84,21 @@ namespace HeapExplorer
         [NonSerialized]
         public System.Boolean containsFieldOfReferenceTypeInInheritenceChain;
 
+        /// <inheritdoc/>
+        string PackedMemorySnapshot.TypeForSubclassSearch.name {
+            get { return name; }
+        }
+
+        /// <inheritdoc/>
+        int PackedMemorySnapshot.TypeForSubclassSearch.typeArrayIndex {
+            get { return managedTypesArrayIndex; }
+        }
+
+        /// <inheritdoc/>
+        int PackedMemorySnapshot.TypeForSubclassSearch.baseTypeArrayIndex {
+            get { return baseOrElementTypeIndex; }
+        }
+        
         // An array containing descriptions of all instance fields of this type.
         public PackedManagedField[] instanceFields
         {

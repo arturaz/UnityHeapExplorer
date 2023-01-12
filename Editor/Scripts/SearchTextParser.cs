@@ -24,7 +24,14 @@ namespace HeapExplorer
             public LogicalOperator Op;
             public bool Not;
             public bool Exact;
-            public string Text;
+            
+            /// <summary>
+            /// Lower-cased text.
+            /// <para/>
+            /// It is a lot cheaper to lower-case the string once than use
+            /// <see cref="StringComparison.OrdinalIgnoreCase"/> on every search. 
+            /// </summary>
+            public string LowerCasedText;
         }
 
         public class Result
@@ -57,13 +64,12 @@ namespace HeapExplorer
                 return labels.Contains(label);
             }
 
-            public bool IsNameMatch(string text)
+            /// <param name="lowerCasedText">string that underwent transformation to lower-case.</param>
+            public bool IsNameMatch(string lowerCasedText)
             {
                 if (m_NamesExpr.Count == 0)
                     return true;
-                if (text == null || text.Length == 0)
-                    return true;
-
+                
                 var or_result = false;
                 var or_result_missing = true;
 
@@ -75,18 +81,18 @@ namespace HeapExplorer
                     {
                         if (expression.Not)
                         {
-                            if (!expression.Exact && text.IndexOf(expression.Text, StringComparison.OrdinalIgnoreCase) != -1)
+                            if (!expression.Exact && lowerCasedText.ContainsFast(expression.LowerCasedText))
                                 return false;
 
-                            if (expression.Exact && text.Equals(expression.Text, StringComparison.OrdinalIgnoreCase))
+                            if (expression.Exact && lowerCasedText.Equals(expression.LowerCasedText, StringComparison.Ordinal))
                                 return false;
                         }
                         else
                         {
-                            if (!expression.Exact && text.IndexOf(expression.Text, StringComparison.OrdinalIgnoreCase) == -1)
+                            if (!expression.Exact && !lowerCasedText.ContainsFast(expression.LowerCasedText))
                                 return false;
 
-                            if (expression.Exact && !text.Equals(expression.Text, StringComparison.OrdinalIgnoreCase))
+                            if (expression.Exact && !lowerCasedText.Equals(expression.LowerCasedText, StringComparison.Ordinal))
                                 return false;
                         }
                     }
@@ -94,18 +100,18 @@ namespace HeapExplorer
                     {
                         if (expression.Not)
                         {
-                            if (!expression.Exact && text.IndexOf(expression.Text, StringComparison.OrdinalIgnoreCase) == -1)
+                            if (!expression.Exact && !lowerCasedText.ContainsFast(expression.LowerCasedText))
                                 or_result = true;
 
-                            if (expression.Exact && !text.Equals(expression.Text, StringComparison.OrdinalIgnoreCase))
+                            if (expression.Exact && !lowerCasedText.Equals(expression.LowerCasedText, StringComparison.Ordinal))
                                 or_result = true;
                         }
                         else
                         {
-                            if (!expression.Exact && text.IndexOf(expression.Text, StringComparison.OrdinalIgnoreCase) != -1)
+                            if (!expression.Exact && lowerCasedText.ContainsFast(expression.LowerCasedText))
                                 or_result = true;
 
-                            if (expression.Exact && text.Equals(expression.Text, StringComparison.OrdinalIgnoreCase))
+                            if (expression.Exact && lowerCasedText.Equals(expression.LowerCasedText, StringComparison.Ordinal))
                                 or_result = true;
                         }
                         or_result_missing = false;
@@ -179,7 +185,7 @@ namespace HeapExplorer
                                 names[names.Count - 1].Op = LogicalOperator.Or;
                             var r = new ResultExpr();
                             r.Op = condition;
-                            r.Text = builder.ToString().Trim();
+                            r.LowerCasedText = builder.ToString().Trim().ToLowerInvariant();
                             r.Not = not;
                             r.Exact = exact;
                             names.Add(r);
@@ -229,7 +235,7 @@ namespace HeapExplorer
                         names[names.Count-1].Op = LogicalOperator.Or;
                     var r = new ResultExpr();
                     r.Op = condition;
-                    r.Text = builder.ToString().Trim();
+                    r.LowerCasedText = builder.ToString().Trim().ToLowerInvariant();
                     r.Not = not;
                     r.Exact = exact;
                     names.Add(r);
@@ -249,7 +255,7 @@ namespace HeapExplorer
             //    builder.AppendLine("Label: " + labels[n]);
 
             foreach (var v in result.m_NamesExpr)
-                result.names.Add(v.Text);
+                result.names.Add(v.LowerCasedText);
 
             // sort by operator. AND first, OR second
             var nam = new List<ResultExpr>();
@@ -323,6 +329,14 @@ namespace HeapExplorer
                 if (++loopguard > 10000)
                     break;
             }
+        }
+
+        /// <summary>
+        /// Makes sure to compare using the <see cref="StringComparison.Ordinal"/> which is the fastest way there is. 
+        /// </summary>
+        static bool ContainsFast(this string haystack, string needle) 
+        {
+            return haystack.IndexOf(needle, StringComparison.Ordinal) >= 0;
         }
     }
 }

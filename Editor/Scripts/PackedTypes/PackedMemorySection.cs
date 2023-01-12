@@ -10,18 +10,26 @@ using System;
 
 namespace HeapExplorer
 {
-    // A dump of a piece of memory from the player that's being profiled.
+    /// <summary>
+    /// A dump of a piece of memory from the player that's being profiled.
+    /// </summary>
     [Serializable]
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
     public struct PackedMemorySection
     {
-        // The actual bytes of the memory dump.
+        /// <summary>
+        /// The actual bytes of the memory dump.
+        /// </summary>
         public System.Byte[] bytes;
 
-        // The start address of this piece of memory.
+        /// <summary>
+        /// The start address of this piece of memory.
+        /// </summary>
         public System.UInt64 startAddress;
 
-        // The index into the snapshot.managedHeapSections array
+        /// <summary>
+        /// The index into the <see cref="PackedMemorySnapshot.managedHeapSections"/> array
+        /// </summary>
         [System.NonSerialized]
         public int arrayIndex;
 

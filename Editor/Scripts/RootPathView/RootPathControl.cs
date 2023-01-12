@@ -8,6 +8,7 @@ using UnityEngine;
 using UnityEditor.IMGUI.Controls;
 using UnityEditor;
 using System.Linq;
+using System.Text;
 
 namespace HeapExplorer
 {
@@ -654,6 +655,28 @@ namespace HeapExplorer
                         if (rootPath != null)
                             EditorGUI.LabelField(position, rootPath.count.ToString());
                         break;
+                }
+
+                if (column == 0) {
+                    var e = Event.current;
+                    if (e.type == EventType.ContextClick && position.Contains(e.mousePosition))
+                    {
+                        var menu = new GenericMenu();
+                        menu.AddItem(new GUIContent("Copy path"), on: false, (GenericMenu.MenuFunction2)delegate (object userData)
+                        {
+                            var rootPath = (RootPath) userData;
+                            var text = new StringBuilder(rootPath.reasonString);
+                            text.Append("\n\n");
+                            var count = rootPath.count;
+                            for (var idx = 0; idx < count; idx++) {
+                                // Go backwards to mimic the view in Unity.
+                                var objectProxy = rootPath[count - idx - 1];
+                                text.AppendFormat("[{0}] {1}\n", idx, objectProxy);
+                            }
+                            EditorGUIUtility.systemCopyBuffer = text.ToString();
+                        }, rootPath);
+                        menu.ShowAsContext();
+                    }
                 }
             }
         }

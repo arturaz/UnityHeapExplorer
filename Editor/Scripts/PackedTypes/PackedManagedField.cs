@@ -15,16 +15,24 @@ namespace HeapExplorer
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
     public struct PackedManagedField
     {
-        // Offset of this field.
+        /// <summary>
+        /// Offset of this field.
+        /// </summary>
         public System.Int32 offset;
 
-        // The typeindex into PackedMemorySnapshot.typeDescriptions of the type this field belongs to.
+        /// <summary>
+        /// The type index into <see cref="PackedMemorySnapshot.managedTypes"/> of the type this field belongs to.
+        /// </summary>
         public System.Int32 managedTypesArrayIndex;
 
-        // Name of this field.
+        /// <summary>
+        /// Name of this field.
+        /// </summary>
         public System.String name;
 
-        // Is this field static?
+        /// <summary>
+        /// Is this field static?
+        /// </summary>
         public System.Boolean isStatic;
 
         [NonSerialized] public bool isBackingField;

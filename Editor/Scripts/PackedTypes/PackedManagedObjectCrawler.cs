@@ -19,10 +19,10 @@ namespace HeapExplorer
         public static bool s_IgnoreNestedStructs = true;
 
         long m_TotalCrawled;
-        List<PackedManagedObject> m_Crawl = new List<PackedManagedObject>(1024 * 1024);
-        Dictionary<ulong, int> m_Seen = new Dictionary<ulong, int>(1024 * 1024);
-        List<PackedManagedObject> m_ManagedObjects = new List<PackedManagedObject>(1024 * 1024);
-        List<PackedManagedStaticField> m_StaticFields = new List<PackedManagedStaticField>(10 * 1024);
+        readonly List<PackedManagedObject> m_Crawl = new List<PackedManagedObject>(1024 * 1024);
+        readonly Dictionary<ulong, int> m_Seen = new Dictionary<ulong, int>(1024 * 1024);
+        readonly List<PackedManagedObject> m_ManagedObjects = new List<PackedManagedObject>(1024 * 1024);
+        readonly List<PackedManagedStaticField> m_StaticFields = new List<PackedManagedStaticField>(10 * 1024);
         PackedMemorySnapshot m_Snapshot;
         PackedManagedField m_CachedPtr;
         MemoryReader m_MemoryReader;
@@ -47,7 +47,7 @@ namespace HeapExplorer
 #endif
         }
 
-        public void Crawl(PackedMemorySnapshot snapshot, List<ulong> substitudeAddresses)
+        public void Crawl(PackedMemorySnapshot snapshot, List<ulong> substituteAddresses)
         {
             m_TotalCrawled = 0;
             m_Snapshot = snapshot;
@@ -58,10 +58,10 @@ namespace HeapExplorer
             CrawlGCHandles();
             EndProfilerSample();
 
-            BeginProfilerSample("substitudeAddresses");
-            for (var n = 0; n < substitudeAddresses.Count; ++n)
+            BeginProfilerSample("substituteAddresses");
+            for (var n = 0; n < substituteAddresses.Count; ++n)
             {
-                var addr = substitudeAddresses[n];
+                var addr = substituteAddresses[n];
                 if (m_Seen.ContainsKey(addr))
                     continue;
                 TryAddManagedObject(addr);
@@ -87,17 +87,22 @@ namespace HeapExplorer
 
             // UnityEngine.Object types on the managed side have a m_CachedPtr field that
             // holds the native memory address of the corresponding native object of this managed object.
-            m_CachedPtr = new PackedManagedField();
+            const string FIELD_NAME = "m_CachedPtr";
 
             for (int n = 0, nend = unityEngineObject.fields.Length; n < nend; ++n)
             {
                 var field = unityEngineObject.fields[n];
-                if (field.name != "m_CachedPtr")
+                if (field.name != FIELD_NAME)
                     continue;
 
                 m_CachedPtr = field;
                 return;
             }
+            
+            throw new Exception(string.Format(
+                "Could not find '{0}' field for Unity object type '{1}', this probably means the internal structure "
+                + "of Unity has changed and the tool needs updating.", FIELD_NAME, unityEngineObject.name
+            ));
         }
 
         bool ContainsReferenceType(int typeIndex)
@@ -161,14 +166,20 @@ namespace HeapExplorer
 
                 while (typeIndex != -1)
                 {
-                    if (++loopGuard > 264)
+                    var baseType = m_Snapshot.managedTypes[typeIndex];
+                    
+                    if (++loopGuard > 264) 
+                    {
+                        var typeName = baseType.name;
+                        Debug.LogWarningFormat(
+                            "HeapExplorer: hit loop guard in CrawlManagedObjects(). Type = '{0}'", typeName
+                        );
                         break;
+                    }
 
                     AbstractMemoryReader memoryReader = m_MemoryReader;
                     if (mo.staticBytes != null)
                         memoryReader = new StaticMemoryReader(m_Snapshot, mo.staticBytes);
-
-                    var baseType = m_Snapshot.managedTypes[typeIndex];
 
                     if (baseType.isArray)
                     {
@@ -368,30 +379,39 @@ namespace HeapExplorer
             var managedTypes = m_Snapshot.managedTypes;
             var staticManagedTypes = new List<int>(1024);
 
-            // Unity BUG: (Case 984330) PackedMemorySnapshot: Type contains staticFieldBytes, but has no static field
+            // Unity BUG: (Case 984330) PackedMemorySnapshot: Type contains staticFieldBytes, but has no static fields
             for (int n = 0, nend = managedTypes.Length; n < nend; ++n)
             {
-                var type = managedTypes[n];
-
                 // Some static classes have no staticFieldBytes. As I understand this, the staticFieldBytes
                 // are only filled if that static class has been initialized (its cctor called), otherwise it's zero.
-                if (type.staticFieldBytes == null || type.staticFieldBytes.Length == 0)
+                //
+                // This is normal behaviour.
+                if (managedTypes[n].staticFieldBytes == null || managedTypes[n].staticFieldBytes.Length == 0) 
+                {
+                    // Debug.LogFormat(
+                    //     "HeapExplorer: managed type '{0}' does not have static fields.", managedTypes[n].name
+                    // );
                     continue;
+                }
 
                 //var hasStaticField = false;
-                for (int j = 0, jend = type.fields.Length; j < jend; ++j)
+                for (
+                    int fieldIndex = 0, fieldIndexEnd = managedTypes[n].fields.Length; 
+                    fieldIndex < fieldIndexEnd;
+                    ++fieldIndex
+                )
                 {
-                    if (!type.fields[j].isStatic)
+                    if (!managedTypes[n].fields[fieldIndex].isStatic)
                         continue;
 
-                    //var field = type.fields[j];
+                    //var field = managedTypes[n].fields[j];
                     //var fieldType = managedTypes[field.managedTypesArrayIndex];
                     //hasStaticField = true;
 
                     var item = new PackedManagedStaticField
                     {
-                        managedTypesArrayIndex = type.managedTypesArrayIndex,
-                        fieldIndex = j,
+                        managedTypesArrayIndex = managedTypes[n].managedTypesArrayIndex,
+                        fieldIndex = fieldIndex,
                         staticFieldsArrayIndex = m_StaticFields.Count,
                     };
                     m_StaticFields.Add(item);
@@ -400,7 +420,7 @@ namespace HeapExplorer
                 }
 
                 //if (hasStaticField)
-                    staticManagedTypes.Add(type.managedTypesArrayIndex);
+                    staticManagedTypes.Add(managedTypes[n].managedTypesArrayIndex);
             }
 
             m_Snapshot.managedStaticTypes = staticManagedTypes.ToArray();
@@ -447,10 +467,9 @@ namespace HeapExplorer
                     m_TotalCrawled++;
                     continue;
                 }
-
                 // If it's a reference type, it simply points to a ManagedObject on the heap and all
                 // we need to do it to create a new ManagedObject and add it to the list to crawl.
-                if (!fieldType.isValueType)
+                else
                 {
                     var addr = staticReader.ReadPointer((uint)field.offset);
                     if (addr == 0)
@@ -496,10 +515,7 @@ namespace HeapExplorer
                     }
 
                     m_Snapshot.AddConnection(PackedConnection.Kind.StaticField, staticField.staticFieldsArrayIndex, PackedConnection.Kind.Managed, newObjIndex);
-
-                    continue;
                 }
-
             }
         }
 
@@ -546,34 +562,36 @@ namespace HeapExplorer
         {
             var gcHandles = m_Snapshot.gcHandles;
 
-            for (int n=0, nend = gcHandles.Length; n < nend; ++n)
+            for (int n=0, nend = gcHandles.Length; n < nend; ++n) 
             {
-                if (gcHandles[n].target == 0)
+                var gcHandle = gcHandles[n];
+                if (gcHandle.target == 0)
                 {
-                    m_Snapshot.Warning("HeapExplorer: Cannot find GCHandle target '{0:X}' (Unity bug Case 977003).", gcHandles[n].target);
+                    m_Snapshot.Warning("HeapExplorer: Cannot find GCHandle target '{0:X}' (Unity bug Case 977003).", gcHandle.target);
                     continue;
                 }
 
 #if DEBUG_BREAK_ON_ADDRESS
-                if (gcHandles[n].target == DebugBreakOnAddress)
+                if (gcHandle.target == DebugBreakOnAddress)
                 {
                     int a = 0;
                 }
 #endif
 
-                var managedObjectIndex = TryAddManagedObject(gcHandles[n].target);
+                var managedObjectIndex = TryAddManagedObject(gcHandle.target);
                 if (managedObjectIndex == -1)
                     continue;
 
                 var managedObj = m_ManagedObjects[managedObjectIndex];
-                managedObj.gcHandlesArrayIndex = gcHandles[n].gcHandlesArrayIndex;
+                managedObj.gcHandlesArrayIndex = gcHandle.gcHandlesArrayIndex;
                 m_ManagedObjects[managedObjectIndex] = managedObj;
 
                 // Connect GCHandle to ManagedObject
-                m_Snapshot.AddConnection(PackedConnection.Kind.GCHandle, gcHandles[n].gcHandlesArrayIndex, PackedConnection.Kind.Managed, managedObj.managedObjectsArrayIndex);
+                m_Snapshot.AddConnection(PackedConnection.Kind.GCHandle, gcHandle.gcHandlesArrayIndex, PackedConnection.Kind.Managed, managedObj.managedObjectsArrayIndex);
 
                 // Update the GCHandle with the index to its managed object
-                gcHandles[n].managedObjectsArrayIndex = managedObj.managedObjectsArrayIndex;
+                gcHandle.managedObjectsArrayIndex = managedObj.managedObjectsArrayIndex;
+                gcHandles[n] = gcHandle;
 
                 m_TotalCrawled++;
 
@@ -592,7 +610,7 @@ namespace HeapExplorer
             if (managedObj.size > 0)
                 return; // size is set already
 
-            managedObj.size = m_MemoryReader.ReadObjectSize(managedObj.address, type);
+            managedObj.size = m_MemoryReader.ReadObjectSize(managedObj.address, type).ToUIntClamped();
         }
 
         void TryConnectNativeObject(ref PackedManagedObject managedObj)
@@ -613,6 +631,8 @@ namespace HeapExplorer
             // Read the m_cachePtr value
             var nativeObjectAddress = m_MemoryReader.ReadPointer(managedObj.address + (uint)m_CachedPtr.offset);
             EndProfilerSample();
+            // If the native object address is 0 then we have a managed object without the native side, which happens
+            // when you have a leaked managed object.
             if (nativeObjectAddress == 0)
                 return;
 

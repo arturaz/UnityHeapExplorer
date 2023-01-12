@@ -18,7 +18,7 @@ namespace HeapExplorer
             None = 0,
             GCHandle = 1,
             Native = 2,
-            Managed = 3, // managed connections are NOT in the snapshot, we add them ourselfs.
+            Managed = 3, // managed connections are NOT in the snapshot, we add them ourselves.
             StaticField = 4, // static connections are NOT in the snapshot, we add them ourself.
 
             // Must not get greater than 11, otherwise ComputeConnectionKey() fails!
@@ -102,7 +102,7 @@ namespace HeapExplorer
             var nativeObjectsInstanceIds = new int[nativeObjects.instanceId.GetNumEntries()];
             nativeObjects.instanceId.GetEntries(0, nativeObjects.instanceId.GetNumEntries(), ref nativeObjectsInstanceIds);
 
-            // Create lookup table from instanceId to NativeObject arrayindex
+            // Create lookup table from instanceId to NativeObject array index
             var instanceIdToNativeObjectIndex = new Dictionary<int, int>(nativeObjectsInstanceIds.Length);
             for (var n=0; n< nativeObjectsInstanceIds.Length; ++n)
                 instanceIdToNativeObjectIndex.Add(nativeObjectsInstanceIds[n], n);

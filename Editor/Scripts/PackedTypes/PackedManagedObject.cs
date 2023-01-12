@@ -13,29 +13,43 @@ namespace HeapExplorer
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
     public struct PackedManagedObject
     {
-        // The address of the managed object
+        /// <summary>
+        /// The address of the managed object
+        /// </summary>
         public System.UInt64 address;
 
-        // If this object is a static field
+        /// <summary>
+        /// If this object is a static field
+        /// </summary>
         public System.Byte[] staticBytes;
 
-        // The managed type of this managed object
+        /// <summary>
+        /// An index into the <see cref="PackedMemorySnapshot.managedTypes"/> array that stores this managed type
+        /// </summary>
         public System.Int32 managedTypesArrayIndex;
 
-        // An index into the managedObjects array of the snapshot that stores this managed object
+        /// <summary>
+        /// An index into the <see cref="PackedMemorySnapshot.managedObjects"/> array that stores this managed object
+        /// </summary>
         public System.Int32 managedObjectsArrayIndex;
 
-        // The index into the gcHandles array of the snapshot that is connected to this managed object, if any.
+        /// <summary>
+        /// The index into the <see cref="PackedMemorySnapshot.gcHandles"/> array of the snapshot that is connected to
+        /// this managed object, if any.
+        /// </summary>
         public System.Int32 gcHandlesArrayIndex;
 
-        // The index into the nativeObjects array of the snapshot that is connected to this managed object, if any.
+        /// <summary>
+        /// The index into the <see cref="PackedMemorySnapshot.nativeObjects"/> array of the snapshot that is connected
+        /// to this managed object, if any.
+        /// </summary>
         public System.Int32 nativeObjectsArrayIndex;
 
         // Size in bytes of this object.
         // ValueType arrays = count * sizeof(element)
         // ReferenceType arrays = count * sizeof(pointer)
         // String = length * sizeof(wchar) + strlen("\0\0")
-        public System.Int32 size;
+        public uint size;
 
         public static PackedManagedObject New()
         {

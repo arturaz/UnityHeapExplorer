@@ -16,13 +16,13 @@ namespace HeapExplorer
     public struct PackedNativeUnityEngineObject
     {
         // The memory address of the native C++ object. This matches the "m_CachedPtr" field of UnityEngine.Object.
-        public System.Int64 nativeObjectAddress;
+        public ulong nativeObjectAddress;
 
         // InstanceId of this object.
         public System.Int32 instanceId;
 
         // Size in bytes of this object.
-        public System.Int32 size;
+        public ulong size;
 
         // The index used to obtain the native C++ type description from the PackedMemorySnapshot.nativeTypes array.
         public System.Int32 nativeTypesArrayIndex;
@@ -90,10 +90,10 @@ namespace HeapExplorer
                     value[n].isManager = reader.ReadBoolean();
                     value[n].name = reader.ReadString();
                     value[n].instanceId = reader.ReadInt32();
-                    value[n].size = reader.ReadInt32();
+                    value[n].size = reader.ReadUInt64();
                     value[n].nativeTypesArrayIndex = reader.ReadInt32();
                     value[n].hideFlags = (HideFlags)reader.ReadInt32();
-                    value[n].nativeObjectAddress = reader.ReadInt64();
+                    value[n].nativeObjectAddress = reader.ReadUInt64();
 
                     value[n].nativeObjectsArrayIndex = n;
                     value[n].managedObjectsArrayIndex = -1;
@@ -127,8 +127,10 @@ namespace HeapExplorer
             var sourceNativeObjectAddress = new ulong[source.nativeObjectAddress.GetNumEntries()];
             source.nativeObjectAddress.GetEntries(0, source.nativeObjectAddress.GetNumEntries(), ref sourceNativeObjectAddress);
 
-            for (int n = 0, nend = value.Length; n < nend; ++n)
+            for (int n = 0, nend = value.Length; n < nend; ++n) 
             {
+                var nativeObjectAddress = sourceNativeObjectAddress[n];
+                var nativeTypesArrayIndex = sourceNativeTypeArrayIndex[n];
                 value[n] = new PackedNativeUnityEngineObject
                 {
                     isPersistent = (sourceFlags[n] & ObjectFlags.IsPersistent) != 0,
@@ -136,14 +138,23 @@ namespace HeapExplorer
                     isManager = (sourceFlags[n] & ObjectFlags.IsManager) != 0,
                     name = sourceObjectNames[n],
                     instanceId = sourceInstanceIds[n],
-                    size = (int)sourceSizes[n], // TODO: should be ulong
-                    nativeTypesArrayIndex = sourceNativeTypeArrayIndex[n],
+                    size = sourceSizes[n],
+                    nativeTypesArrayIndex = nativeTypesArrayIndex,
                     hideFlags = sourceHideFlags[n],
-                    nativeObjectAddress = (long)sourceNativeObjectAddress[n], // TODO: should be ulong
+                    nativeObjectAddress = nativeObjectAddress,
 
                     nativeObjectsArrayIndex = n,
                     managedObjectsArrayIndex = -1,
                 };
+
+                if (nativeTypesArrayIndex < 0) 
+                {
+                    Debug.LogWarningFormat(
+                        "HeapExplorer: native object at {0:X} does not have an associated native type "
+                        + "(nativeTypesArrayIndex={1}). This should not happen.",
+                        nativeObjectAddress, nativeTypesArrayIndex
+                    );
+                }
             }
 
             return value;

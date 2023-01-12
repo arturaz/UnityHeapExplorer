@@ -25,7 +25,7 @@ namespace HeapExplorer
             }
         }
 
-        public long nativeObjectsSize
+        public ulong nativeObjectsSize
         {
             get
             {
@@ -34,7 +34,7 @@ namespace HeapExplorer
         }
 
         protected long m_NativeObjectsCount;
-        protected long m_NativeObjectsSize;
+        protected ulong m_NativeObjectsSize;
 
         PackedMemorySnapshot m_Snapshot;
         int m_UniqueId = 1;
@@ -81,7 +81,7 @@ namespace HeapExplorer
 
         public void Select(PackedNativeUnityEngineObject obj)
         {
-            var item = FindItemByAddressRecursive(rootItem, (ulong)obj.nativeObjectAddress);
+            var item = FindItemByAddressRecursive(rootItem, obj.nativeObjectAddress);
             SelectItem(item);
         }
 
@@ -419,7 +419,7 @@ namespace HeapExplorer
 
             public abstract string typeName { get; }
             public abstract string name { get; }
-            public abstract long size { get; }
+            public abstract ulong size { get; }
             public abstract int count { get; }
             public abstract System.UInt64 address { get; }
             public abstract bool isDontDestroyOnLoad { get; }
@@ -489,7 +489,7 @@ namespace HeapExplorer
                 }
             }
 
-            public override long size
+            public override ulong size
             {
                 get
                 {
@@ -597,7 +597,7 @@ namespace HeapExplorer
                         break;
 
                     case Column.Size:
-                        HeEditorGUI.Size(position, size);
+                        HeEditorGUI.Size(position, size.ToLongClamped());
                         break;
 
                     case Column.Address:
@@ -725,7 +725,7 @@ namespace HeapExplorer
             }
 
             long m_Size = -1;
-            public override long size
+            public override ulong size
             {
                 get
                 {
@@ -738,12 +738,12 @@ namespace HeapExplorer
                             {
                                 var child = children[n] as AbstractItem;
                                 if (child != null)
-                                    m_Size += child.size;
+                                    m_Size += child.size.ToLongClamped();
                             }
                         }
                     }
 
-                    return m_Size;
+                    return m_Size.ToULongClamped();
                 }
             }
 
@@ -821,7 +821,7 @@ namespace HeapExplorer
                         break;
 
                     case Column.Size:
-                        HeEditorGUI.Size(position, size);
+                        HeEditorGUI.Size(position, size.ToLongClamped());
                         break;
 
                     case Column.Count:

@@ -510,54 +510,63 @@ namespace HeapExplorer
             return true;
         }
 
-        public bool IsSubclassOf(PackedNativeType type, int baseTypeIndex)
+        /// <summary>
+        /// Interface for <see cref="PackedMemorySnapshot.IsSubclassOf{T}(HeapExplorer.PackedNativeType,int)"/>.
+        /// </summary>
+        public interface TypeForSubclassSearch 
         {
-            if (type.nativeTypeArrayIndex == baseTypeIndex)
+            /// <summary>The type name.</summary>
+            string name { get; }
+            
+            /// <summary>Index of the type in the array.</summary>
+            int typeArrayIndex { get; }
+            
+            /// <summary>Index of the base type in the array or -1 if this has no base type.</summary>
+            int baseTypeArrayIndex { get; }            
+        }
+        
+        public bool IsSubclassOf<T>(T type, T[] array, int baseTypeIndex) where T : TypeForSubclassSearch
+        {
+            var currentType = type;
+            
+            if (currentType.typeArrayIndex == baseTypeIndex)
                 return true;
 
-            if (baseTypeIndex < 0 || type.nativeTypeArrayIndex < 0)
+            if (baseTypeIndex < 0 || currentType.typeArrayIndex < 0)
                 return false;
 
             var guard = 0;
-            while (type.nativeBaseTypeArrayIndex != -1)
+            while (currentType.baseTypeArrayIndex != -1)
             {
-                // safety code in case of an infite loop
+                // safety code in case of an infinite loop
                 if (++guard > 64)
-                    break;
+                {
+                    var baseType = array[baseTypeIndex];
+                    Error(
+                        "HeapExplorer: Hit a guard while trying to determine whether a {0} type '{1}' is a "
+                        + "subclass of type '{2}'. Last checked type: '{3}'. This should not happen.",
+                        typeof(T).Name, type.name, baseType.name, currentType.name
+                    );
+                    return false;
+                }
 
-                if (type.nativeBaseTypeArrayIndex == baseTypeIndex)
+                if (currentType.baseTypeArrayIndex == baseTypeIndex)
                     return true;
 
                 // get type of the base class
-                type = nativeTypes[type.nativeBaseTypeArrayIndex];
+                currentType = array[currentType.baseTypeArrayIndex];
             }
 
             return false;
         }
 
-        public bool IsSubclassOf(PackedManagedType type, int baseTypeIndex)
+        public bool IsSubclassOf(PackedNativeType type, int baseTypeIndex) 
         {
-            if (type.managedTypesArrayIndex == baseTypeIndex)
-                return true;
+            return IsSubclassOf(type, nativeTypes, baseTypeIndex);
+        }
 
-            if (type.managedTypesArrayIndex < 0 || baseTypeIndex < 0)
-                return false;
-
-            var guard = 0;
-            while (type.baseOrElementTypeIndex != -1)
-            {
-                // safety code in case of an infite loop
-                if (++guard > 64)
-                    return false;
-
-                if (type.managedTypesArrayIndex == baseTypeIndex)
-                    return true;
-
-                // get type of the base class
-                type = managedTypes[type.baseOrElementTypeIndex];
-            }
-
-            return false;
+        public bool IsSubclassOf(PackedManagedType type, int baseTypeIndex) {
+            return IsSubclassOf(type, managedTypes, baseTypeIndex);
         }
 
         #region Serialization
@@ -730,26 +739,33 @@ namespace HeapExplorer
             {
                 managedTypes[n].isUnityEngineObject = IsSubclassOf(managedTypes[n], coreTypes.unityEngineObject);
                 managedTypes[n].containsFieldOfReferenceType = ContainsFieldOfReferenceType(managedTypes[n]);
-                managedTypes[n].containsFieldOfReferenceTypeInInheritenceChain = ContainsFieldOfReferenceTypeInInheritenceChain(managedTypes[n]);
+                managedTypes[n].containsFieldOfReferenceTypeInInheritenceChain = ContainsFieldOfReferenceTypeInInheritanceChain(managedTypes[n]);
             }
         }
 
-        bool ContainsFieldOfReferenceTypeInInheritenceChain(PackedManagedType type)
+        bool ContainsFieldOfReferenceTypeInInheritanceChain(PackedManagedType type)
         {
+            var currentType = type;
             var loopGuard = 0;
-            var typeIndex = type.managedTypesArrayIndex;
+            var typeIndex = currentType.managedTypesArrayIndex;
             while (typeIndex >= 0 && typeIndex < managedTypes.Length)
             {
                 if (++loopGuard > 64)
                 {
+                    Error(
+                        "HeapExplorer: Hit a guard while trying to determine whether a managed type '{0}' contains "
+                        + "a field of reference type in inheritance chain. Last checked type: '{1}'. "
+                        + "This should not happen.",
+                        currentType.name, type.name
+                    );
                     break;
                 }
 
-                type = managedTypes[typeIndex];
-                if (ContainsFieldOfReferenceType(type))
+                currentType = managedTypes[typeIndex];
+                if (ContainsFieldOfReferenceType(currentType))
                     return true;
 
-                typeIndex = type.baseOrElementTypeIndex;
+                typeIndex = currentType.baseOrElementTypeIndex;
             }
 
             return false;
@@ -1030,11 +1046,11 @@ namespace HeapExplorer
             }
         }
 
-        List<ulong> InitializeManagedObjectSubstitudes(string snapshotPath)
+        List<ulong> InitializeManagedObjectSubstitutes(string snapshotPath)
         {
-            busyString = "Substitude ManagedObjects";
+            busyString = "Substitute ManagedObjects";
 
-            var substitudeManagedObjects = new List<ulong>();
+            var substituteManagedObjects = new List<ulong>();
             if (!string.IsNullOrEmpty(snapshotPath) && System.IO.File.Exists(snapshotPath))
             {
                 var p = snapshotPath + ".ManagedObjects.txt";
@@ -1053,7 +1069,7 @@ namespace HeapExplorer
                             ulong value;
                             ulong.TryParse(line, System.Globalization.NumberStyles.HexNumber, null, out value);
                             if (value != 0)
-                                substitudeManagedObjects.Add(value);
+                                substituteManagedObjects.Add(value);
                             else
                                 Error("Could not parse '{0}' as hex number.", line);
                         }
@@ -1062,7 +1078,7 @@ namespace HeapExplorer
                             ulong value;
                             ulong.TryParse(line, System.Globalization.NumberStyles.Number, null, out value);
                             if (value != 0)
-                                substitudeManagedObjects.Add(value);
+                                substituteManagedObjects.Add(value);
                             else
                                 Error("Could not parse '{0}' as integer number. If this is a Hex number, prefix it with '0x'.", line);
                         }
@@ -1070,7 +1086,7 @@ namespace HeapExplorer
                 }
             }
 
-            return substitudeManagedObjects;
+            return substituteManagedObjects;
         }
 
         public void Initialize(string snapshotPath = null)
@@ -1112,14 +1128,14 @@ namespace HeapExplorer
                 abortActiveStepRequested = false;
                 EndProfilerSample();
 
-                BeginProfilerSample("substitudeManagedObjects");
-                var substitudeManagedObjects = InitializeManagedObjectSubstitudes(snapshotPath);
+                BeginProfilerSample("substituteManagedObjects");
+                var substituteManagedObjects = InitializeManagedObjectSubstitutes(snapshotPath);
                 EndProfilerSample();
 
                 BeginProfilerSample("InitializeManagedObjects");
                 busyString = "Analyzing ManagedObjects";
                 var crawler = new PackedManagedObjectCrawler();
-                crawler.Crawl(this, substitudeManagedObjects);
+                crawler.Crawl(this, substituteManagedObjects);
                 abortActiveStepRequested = false;
                 EndProfilerSample();
 

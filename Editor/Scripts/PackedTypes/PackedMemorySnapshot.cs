@@ -15,27 +15,37 @@ namespace HeapExplorer
     {
         public PackedMemorySnapshotHeader header = new PackedMemorySnapshotHeader();
 
-        // Descriptions of all the C++ unity types the profiled player knows about.
+        /// <summary>Descriptions of all the C++ unity types the profiled player knows about.</summary>
         public PackedNativeType[] nativeTypes = new PackedNativeType[0];
 
-        // All native C++ objects that were loaded at time of the snapshot.
+        /// <summary>All native C++ objects that were loaded at time of the snapshot.</summary>
         public PackedNativeUnityEngineObject[] nativeObjects = new PackedNativeUnityEngineObject[0];
 
-        // All GC handles in use in the memorysnapshot.
+        /// <summary>All GC handles in use in the memory snapshot.</summary>
         public PackedGCHandle[] gcHandles = new PackedGCHandle[0];
 
-        // The unmodified connections array of "from -> to" pairs that describe which things are keeping which other things alive.
-        // connections 0..gcHandles.Length-1 represent connections FROM gchandles
-        // connections gcHandles.Length..connections.Length-1 represent connections FROM native
+        /// <summary>
+        /// The unmodified connections array of "from -> to" pairs that describe which things are keeping which other things alive.
+        /// <para/>
+        /// connections 0..gcHandles.Length-1 represent connections FROM gchandles
+        /// <para/>
+        /// connections gcHandles.Length..connections.Length-1 represent connections FROM native
+        /// </summary>
         public PackedConnection[] connections = new PackedConnection[0];
 
-        // Array of actual managed heap memory sections. These are sorted by address after snapshot initialization.
+        /// <summary>
+        /// Array of actual managed heap memory sections. These are sorted by address after snapshot initialization.
+        /// </summary>
         public PackedMemorySection[] managedHeapSections = new PackedMemorySection[0];
 
-        // Descriptions of all the managed types that were known to the virtual machine when the snapshot was taken.
+        /// <summary>
+        /// Descriptions of all the managed types that were known to the virtual machine when the snapshot was taken.
+        /// </summary>
         public PackedManagedType[] managedTypes = new PackedManagedType[0];
 
-        // Information about the virtual machine running executing the managade code inside the player.
+        /// <summary>
+        /// Information about the virtual machine running executing the managed code inside the player.
+        /// </summary>
         public PackedVirtualMachineInformation virtualMachineInformation = new PackedVirtualMachineInformation();
 
         /// <summary>

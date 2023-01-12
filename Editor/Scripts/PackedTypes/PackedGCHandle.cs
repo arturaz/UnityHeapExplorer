@@ -23,7 +23,9 @@ namespace HeapExplorer
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
     public struct PackedGCHandle
     {
-        // The address of the managed object that the GC handle is referencing.
+        /// <summary>
+        /// The address of the managed object that the GC handle is referencing.
+        /// </summary>
         public System.UInt64 target;
 
         [NonSerialized] public System.Int32 gcHandlesArrayIndex;

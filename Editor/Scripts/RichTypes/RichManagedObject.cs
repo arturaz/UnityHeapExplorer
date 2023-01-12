@@ -65,7 +65,7 @@ namespace HeapExplorer
             }
         }
 
-        public System.Int32 size
+        public uint size
         {
             get
             {
@@ -125,7 +125,9 @@ namespace HeapExplorer
 
         public override string ToString()
         {
-            return string.Format("Valid: {0}, Addr: {1:X}, Type: {2}", isValid, address, type.name);
+            // We output the address with '0x' prefix to make it comfortable to copy and paste it into an exact search
+            // field.
+            return string.Format("Valid: {0}, Addr: 0x{1:X}, Type: {2}", isValid, address, type.name);
         }
 
         public static readonly RichManagedObject invalid = new RichManagedObject()

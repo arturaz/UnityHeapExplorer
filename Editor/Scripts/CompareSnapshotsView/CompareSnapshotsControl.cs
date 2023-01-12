@@ -139,7 +139,7 @@ namespace HeapExplorer
 
                 foreach (var section in snapshot.managedHeapSections)
                 {
-                    parent.size[k] += (long)section.size;
+                    parent.size[k] += section.size;
                 }
 
                 parent.count[k] += snapshot.managedHeapSections.Length;
@@ -164,7 +164,7 @@ namespace HeapExplorer
 
                 var snapshot = snapshots[k];
 
-                parent.size[k] += snapshot.gcHandles.Length * snapshot.virtualMachineInformation.pointerSize;
+                parent.size[k] += (snapshot.gcHandles.Length * snapshot.virtualMachineInformation.pointerSize).ToUIntClamped();
                 parent.count[k] += snapshot.gcHandles.Length;
             }
         }
@@ -303,14 +303,14 @@ namespace HeapExplorer
 
         class Item : AbstractTreeViewItem
         {
-            public long[] size = new long[2];
+            public ulong[] size = new ulong[2];
             public long[] count = new long[2];
 
             public long sizeDiff
             {
                 get
                 {
-                    return size[1] - size[0];
+                    return size[1].ToLongClamped() - size[0].ToLongClamped();
                 }
             }
 
@@ -357,11 +357,11 @@ namespace HeapExplorer
                         break;
 
                     case EColumn.SizeA:
-                        HeEditorGUI.Size(position, size[0]);
+                        HeEditorGUI.Size(position, size[0].ToLongClamped());
                         break;
 
                     case EColumn.SizeB:
-                        HeEditorGUI.Size(position, size[1]);
+                        HeEditorGUI.Size(position, size[1].ToLongClamped());
                         break;
 
                     case EColumn.SizeDiff:
