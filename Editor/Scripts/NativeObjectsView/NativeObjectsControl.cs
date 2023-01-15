@@ -563,7 +563,7 @@ namespace HeapExplorer
                 {
                     HeEditorGUI.NativeObjectIcon(HeEditorGUI.SpaceL(ref position, position.height), m_Object.packed);
 
-                    if (m_Object.managedObject.isValid)
+                    if (m_Object.managedObject.HasValue)
                     {
                         if (HeEditorGUI.CsButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
@@ -635,7 +635,7 @@ namespace HeapExplorer
                     menu.AddItem(new GUIContent("Find in Project"), false, (GenericMenu.MenuFunction2)delegate (object userData)
                     {
                         var o = (RichNativeObject)userData;
-                        HeEditorUtility.SearchProjectBrowser(string.Format("t:{0} {1}", o.type.name, o.name));
+                        HeEditorUtility.SearchProjectBrowser($"t:{o.type.name} {o.name}");
                     }, m_Object);
                 }
             }

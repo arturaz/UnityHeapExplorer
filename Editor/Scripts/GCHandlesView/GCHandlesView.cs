@@ -68,12 +68,16 @@ namespace HeapExplorer
 
         public override void RestoreCommand(GotoCommand command)
         {
-            m_HandlesControl.Select(command.toGCHandle.packed);
+            if (!command.toGCHandle.valueOut(out var gcHandle)) {
+                Debug.LogError($"{nameof(RestoreCommand)}({command}) failed: no gc handle");
+                return;
+            }
+            m_HandlesControl.Select(gcHandle.packed);
         }
 
         public override int CanProcessCommand(GotoCommand command)
         {
-            if (command.toGCHandle.isValid)
+            if (command.toGCHandle.HasValue)
                 return 10;
 
             return base.CanProcessCommand(command);
@@ -115,7 +119,7 @@ namespace HeapExplorer
                     {
                         using (new EditorGUILayout.HorizontalScope())
                         {
-                            EditorGUILayout.LabelField(string.Format("{0} GCHandle(s)", snapshot.gcHandles.Length), EditorStyles.boldLabel);
+                            EditorGUILayout.LabelField($"{snapshot.gcHandles.Length} GCHandle(s)", EditorStyles.boldLabel);
 
                             if (m_HandlesSearchField.OnToolbarGUI())
                                 m_HandlesControl.Search(m_HandlesSearchField.text);

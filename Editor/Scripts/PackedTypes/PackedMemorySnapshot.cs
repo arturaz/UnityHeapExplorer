@@ -2,10 +2,7 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
 using System;
 
 namespace HeapExplorer
@@ -46,7 +43,7 @@ namespace HeapExplorer
         /// <summary>
         /// Information about the virtual machine running executing the managed code inside the player.
         /// </summary>
-        public PackedVirtualMachineInformation virtualMachineInformation = new PackedVirtualMachineInformation();
+        public PackedVirtualMachineInformation virtualMachineInformation;
 
         /// <summary>
         /// Converts an Unity PackedMemorySnapshot to our own format.
@@ -63,28 +60,28 @@ namespace HeapExplorer
                 value.busyString = "Loading Header";
                 value.header = PackedMemorySnapshotHeader.FromMemoryProfiler();
 
-                value.busyString = string.Format("Loading {0} Native Types", source.nativeTypes.GetNumEntries());
+                value.busyString = $"Loading {source.nativeTypes.GetNumEntries()} Native Types";
                 value.nativeTypes = PackedNativeType.FromMemoryProfiler(source);
 
-                value.busyString = string.Format("Loading {0} Native Objects", source.nativeObjects.GetNumEntries());
+                value.busyString = $"Loading {source.nativeObjects.GetNumEntries()} Native Objects";
                 value.nativeObjects = PackedNativeUnityEngineObject.FromMemoryProfiler(source);
 
-                value.busyString = string.Format("Loading {0} GC Handles", source.gcHandles.GetNumEntries());
+                value.busyString = $"Loading {source.gcHandles.GetNumEntries()} GC Handles";
                 value.gcHandles = PackedGCHandle.FromMemoryProfiler(source);
 
-                value.busyString = string.Format("Loading {0} Object Connections", source.connections.GetNumEntries());
+                value.busyString = $"Loading {source.connections.GetNumEntries()} Object Connections";
                 value.connections = PackedConnection.FromMemoryProfiler(source);
 
-                value.busyString = string.Format("Loading {0} Managed Heap Sections", source.managedHeapSections.GetNumEntries());
+                value.busyString = $"Loading {source.managedHeapSections.GetNumEntries()} Managed Heap Sections";
                 value.managedHeapSections = PackedMemorySection.FromMemoryProfiler(source);
 
-                value.busyString = string.Format("Loading {0} Managed Types", source.typeDescriptions.GetNumEntries());
+                value.busyString = $"Loading {source.typeDescriptions.GetNumEntries()} Managed Types";
                 value.managedTypes = PackedManagedType.FromMemoryProfiler(source);
 
                 value.busyString = "Loading VM Information";
                 value.virtualMachineInformation = PackedVirtualMachineInformation.FromMemoryProfiler(source);
             }
-            catch (System.Exception e)
+            catch (Exception e)
             {
                 Debug.LogException(e);
                 value = null;
@@ -132,7 +129,7 @@ namespace HeapExplorer
                     try
                     {
                         PackedMemorySnapshotHeader.Read(reader, out header, out busyString);
-                        if (!header.isValid)
+                        if (!header.HasValue)
                             throw new Exception("Invalid header.");
 
                         PackedNativeType.Read(reader, out nativeTypes, out busyString);

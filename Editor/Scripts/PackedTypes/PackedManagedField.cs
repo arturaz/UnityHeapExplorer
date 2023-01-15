@@ -75,7 +75,7 @@ namespace HeapExplorer
 
         public override string ToString()
         {
-            var text = string.Format("name: {0}, offset: {1}, typeIndex: {2}, isStatic: {3}", name, offset, managedTypesArrayIndex, isStatic);
+            var text = $"name: {name}, offset: {offset}, typeIndex: {managedTypesArrayIndex}, isStatic: {isStatic}";
             return text;
         }
     }

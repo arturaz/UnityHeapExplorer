@@ -3,22 +3,32 @@
 // https://github.com/pschraut/UnityHeapExplorer/
 //
 using System;
-using System.Collections.Generic;
-using UnityEngine;
 
 namespace HeapExplorer
 {
     [Serializable]
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
-    public struct PackedManagedStaticField
+    public readonly struct PackedManagedStaticField
     {
-        // The index into PackedMemorySnapshot.typeDescriptions of the type this field belongs to.
-        public System.Int32 managedTypesArrayIndex;
+        /// <summary>
+        /// The index into <see cref="PackedMemorySnapshot.managedTypes"/> of the type this field belongs to.
+        /// </summary>
+        public readonly int managedTypesArrayIndex;
 
-        // The index into the typeDescription.fields array
-        public System.Int32 fieldIndex;
+        /// <summary>
+        /// The index into the <see cref="PackedManagedType.fields"/> array
+        /// </summary>
+        public readonly int fieldIndex;
 
-        // The index into the PackedMemorySnapshot.staticFields array
-        public System.Int32 staticFieldsArrayIndex;
+        /// <summary>
+        /// The index into the <see cref="PackedMemorySnapshot.managedStaticFields"/> array
+        /// </summary>
+        public readonly int staticFieldsArrayIndex;
+
+        public PackedManagedStaticField(int managedTypesArrayIndex, int fieldIndex, int staticFieldsArrayIndex) {
+            this.managedTypesArrayIndex = managedTypesArrayIndex;
+            this.fieldIndex = fieldIndex;
+            this.staticFieldsArrayIndex = staticFieldsArrayIndex;
+        }
     }
 }

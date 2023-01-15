@@ -2,10 +2,7 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
 using System;
 using UnityEditor.Profiling.Memory.Experimental;
 
@@ -27,18 +24,25 @@ namespace HeapExplorer
         // The index used to obtain the native C++ type description from the PackedMemorySnapshot.nativeTypes array.
         public System.Int32 nativeTypesArrayIndex;
 
-        // The index of this element in the PackedMemorySnapshot.nativeObjects array.
+        /// <summary>
+        /// The index of this element in the <see cref="PackedMemorySnapshot.nativeObjects"/> array.
+        /// </summary>
         [NonSerialized]
         public System.Int32 nativeObjectsArrayIndex;
 
-        // The index of the C# counter-part in the PackedMemorySnapshot.managedObjects array or -1 if no C# object exists.
+        /// <summary>
+        /// The index of the C# counter-part in the <see cref="PackedMemorySnapshot.managedObjects"/> array or `None`
+        /// if no C# object exists.
+        /// </summary>
         [NonSerialized]
-        public System.Int32 managedObjectsArrayIndex;
+        public Option<PackedManagedObject.ArrayIndex> managedObjectsArrayIndex;
 
         // The hideFlags this native object has.
         public HideFlags hideFlags;
 
-        // Name of this object.
+        /// <summary>
+        /// Name of this object.
+        /// </summary>
         public System.String name;
 
         // Is this object persistent? (Assets are persistent, objects stored in scenes are persistent, dynamically created objects are not)
@@ -80,7 +84,7 @@ namespace HeapExplorer
             if (version >= 1)
             {
                 var length = reader.ReadInt32();
-                stateString = string.Format("Loading {0} Native Objects", length);
+                stateString = $"Loading {length} Native Objects";
                 value = new PackedNativeUnityEngineObject[length];
 
                 for (int n = 0, nend = value.Length; n < nend; ++n)
@@ -96,7 +100,6 @@ namespace HeapExplorer
                     value[n].nativeObjectAddress = reader.ReadUInt64();
 
                     value[n].nativeObjectsArrayIndex = n;
-                    value[n].managedObjectsArrayIndex = -1;
                 }
             }
         }
@@ -144,7 +147,6 @@ namespace HeapExplorer
                     nativeObjectAddress = nativeObjectAddress,
 
                     nativeObjectsArrayIndex = n,
-                    managedObjectsArrayIndex = -1,
                 };
 
                 if (nativeTypesArrayIndex < 0) 

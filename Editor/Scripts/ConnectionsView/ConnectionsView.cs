@@ -156,7 +156,7 @@ namespace HeapExplorer
                     {
                         using (new EditorGUILayout.HorizontalScope())
                         {
-                            EditorGUILayout.LabelField(string.Format("References to {0} object(s)", m_ReferencesControl.count), EditorStyles.boldLabel);
+                            EditorGUILayout.LabelField($"References to {m_ReferencesControl.count} object(s)", EditorStyles.boldLabel);
                             if (m_ReferencesSearchField.OnToolbarGUI())
                                 m_ReferencesControl.Search(m_ReferencesSearchField.text);
                             if (afterReferencesToolbarGUI != null)
@@ -189,7 +189,7 @@ namespace HeapExplorer
                     {
                         using (new EditorGUILayout.HorizontalScope())
                         {
-                            EditorGUILayout.LabelField(string.Format("Referenced by {0} object(s)", m_ReferencedByControl.count), EditorStyles.boldLabel);
+                            EditorGUILayout.LabelField($"Referenced by {m_ReferencedByControl.count} object(s)", EditorStyles.boldLabel);
                             if (m_ReferencedBySearchField.OnToolbarGUI())
                                 m_ReferencedByControl.Search(m_ReferencedBySearchField.text);
 
@@ -241,17 +241,17 @@ namespace HeapExplorer
                 var references = new List<PackedConnection>();
                 var referencedBy = new List<PackedConnection>();
 
-                if (objectProxy != null && objectProxy.gcHandle.isValid)
-                    snapshot.GetConnections(objectProxy.gcHandle.packed, references, referencedBy);
+                if (objectProxy != null && objectProxy.gcHandle.HasValue)
+                    snapshot.GetConnections(objectProxy.gcHandle.Value.packed, references, referencedBy);
 
-                if (objectProxy != null && objectProxy.managed.isValid)
-                    snapshot.GetConnections(objectProxy.managed.packed, references, referencedBy);
+                if (objectProxy != null && objectProxy.managed.HasValue)
+                    snapshot.GetConnections(objectProxy.managed.Value.packed, references, referencedBy);
 
-                if (objectProxy != null && objectProxy.native.isValid)
-                    snapshot.GetConnections(objectProxy.native.packed, references, referencedBy);
+                if (objectProxy != null && objectProxy.native.HasValue)
+                    snapshot.GetConnections(objectProxy.native.Value.packed, references, referencedBy);
 
-                if (objectProxy != null && objectProxy.staticField.isValid)
-                    snapshot.GetConnections(objectProxy.staticField.packed, references, referencedBy);
+                if (objectProxy != null && objectProxy.staticField.HasValue)
+                    snapshot.GetConnections(objectProxy.staticField.Value.packed, references, referencedBy);
 
                 if (memorySection.HasValue)
                     snapshot.GetConnections(memorySection.Value, references, referencedBy);

@@ -109,16 +109,13 @@ namespace HeapExplorer
                     break;
 
                 var gcHandle = m_Snapshot.gcHandles[n];
-                var managedTypeIndex = -1;
-                if (gcHandle.managedObjectsArrayIndex >= 0)
-                    managedTypeIndex = m_Snapshot.managedObjects[gcHandle.managedObjectsArrayIndex].managedTypesArrayIndex;
+                var maybeManagedTypeIndex = gcHandle.managedObjectsArrayIndex.map(m_Snapshot, (idx, snapshot) =>
+                    snapshot.managedObjects[idx.index].managedTypesArrayIndex
+                );
 
                 var targetItem = root;
-                if (managedTypeIndex >= 0)
-                {
-                    GroupItem group;
-                    if (!groupLookup.TryGetValue(managedTypeIndex, out group))
-                    {
+                {if (maybeManagedTypeIndex.valueOut(out var managedTypeIndex)) {
+                    if (!groupLookup.TryGetValue(managedTypeIndex, out var group)) {
                         group = new GroupItem
                         {
                             id = m_UniqueId++,
@@ -132,7 +129,7 @@ namespace HeapExplorer
                     }
 
                     targetItem = group;
-                }
+                }}
 
                 var item = new GCHandleItem
                 {
@@ -225,7 +222,7 @@ namespace HeapExplorer
             {
                 get
                 {
-                    return m_GCHandle.managedObject.type.name;
+                    return m_GCHandle.managedObject?.type.name ?? "broken handle";
                 }
             }
 
@@ -277,21 +274,19 @@ namespace HeapExplorer
                 {
                     GUI.Box(HeEditorGUI.SpaceL(ref position, position.height), HeEditorStyles.gcHandleImage, HeEditorStyles.iconStyle);
 
-                    if (m_GCHandle.nativeObject.isValid)
-                    {
+                    {if (m_GCHandle.nativeObject.valueOut(out var nativeObject)) {
                         if (HeEditorGUI.CppButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_GCHandle.nativeObject));
+                            m_Owner.window.OnGoto(new GotoCommand(nativeObject));
                         }
-                    }
+                    }}
 
-                    if (m_GCHandle.managedObject.isValid)
-                    {
+                    {if (m_GCHandle.managedObject.valueOut(out var managedObject)) {
                         if (HeEditorGUI.CsButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_GCHandle.managedObject));
+                            m_Owner.window.OnGoto(new GotoCommand(managedObject));
                         }
-                    }
+                    }}
                 }
 
                 switch ((Column)column)

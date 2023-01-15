@@ -10,6 +10,7 @@ using UnityEngine;
 using UnityEditor;
 using System;
 using System.Threading;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
@@ -123,34 +124,34 @@ namespace HeapExplorer
         /// Find the managed object type at the specified address.
         /// </summary>
         /// <param name="address">The managed object memory address.</param>
-        /// <returns>An index into the snapshot.managedTypes array on success, -1 otherwise.</returns>
-        public int FindManagedObjectTypeOfAddress(System.UInt64 address)
+        /// <returns>An index into the snapshot.managedTypes array on success, `None` otherwise.</returns>
+        public Option<int> FindManagedObjectTypeOfAddress(ulong address)
         {
             // IL2CPP has the class pointer as the first member of the object.
-            int typeIndex = FindManagedTypeOfTypeInfoAddress(address);
-            if (typeIndex != -1)
-                return typeIndex;
+            var typeIndex = FindManagedTypeOfTypeInfoAddress(address);
+            if (typeIndex.isSome) return typeIndex;
 
             // Mono has a vtable pointer as the first member of the object.
             // The first member of the vtable is the class pointer.
-            var heapIndex = FindHeapOfAddress(address);
-            if (heapIndex == -1)
-                return -1;
+            var maybeHeapIndex = FindHeapOfAddress(address);
+            if (!maybeHeapIndex.valueOut(out var heapIndex)) return None._;
 
             var vtable = managedHeapSections[heapIndex];
             var offset = (int)(address - vtable.startAddress);
-            var vtableClassPointer = virtualMachineInformation.pointerSize == 8 ? BitConverter.ToUInt64(vtable.bytes, offset) : BitConverter.ToUInt32(vtable.bytes, offset);
-            if (vtableClassPointer == 0)
-                return -1;
+            var vtableClassPointer = 
+                virtualMachineInformation.pointerSize == 8 
+                    ? BitConverter.ToUInt64(vtable.bytes, offset) 
+                    : BitConverter.ToUInt32(vtable.bytes, offset);
+            if (vtableClassPointer == 0) return None._;
 
             // Mono has a vtable pointer as the first member of the object.
             // The first member of the vtable is the class pointer.
-            heapIndex = FindHeapOfAddress(vtableClassPointer);
-            if (heapIndex == -1)
+            maybeHeapIndex = FindHeapOfAddress(vtableClassPointer);
+            if (maybeHeapIndex.isNone)
             {
-                heapIndex = FindManagedTypeOfTypeInfoAddress(vtableClassPointer);
+                maybeHeapIndex = FindManagedTypeOfTypeInfoAddress(vtableClassPointer);
                 //Error("Cannot find memory segment for vtableClassPointer pointing at address '{0:X}'.", vtableClassPointer);
-                return heapIndex;
+                return maybeHeapIndex;
             }
 
             offset = (int)(vtableClassPointer - managedHeapSections[heapIndex].startAddress);
@@ -168,29 +169,28 @@ namespace HeapExplorer
         /// </summary>
         /// <param name="nativeObjectAddress">The native object address.</param>
         /// <returns>An index into the snapshot.managedObjects array on success, -1 otherwise.</returns>
-        public int FindManagedObjectOfNativeObject(UInt64 nativeObjectAddress)
+        public int? FindManagedObjectOfNativeObject(UInt64 nativeObjectAddress)
         {
             if (nativeObjectAddress == 0)
-                return -1;
+                throw new ArgumentException("address should not be 0", nameof(nativeObjectAddress));
 
             if (m_FindManagedObjectOfNativeObjectLUT == null)
             {
                 m_FindManagedObjectOfNativeObjectLUT = new Dictionary<ulong, int>(managedObjects.Length);
                 for (int n = 0, nend = managedObjects.Length; n < nend; ++n)
                 {
-                    if (managedObjects[n].nativeObjectsArrayIndex >= 0)
+                    if (managedObjects[n].nativeObjectsArrayIndex.valueOut(out var nativeObjectsArrayIndex))
                     {
-                        var address = (ulong)nativeObjects[managedObjects[n].nativeObjectsArrayIndex].nativeObjectAddress;
+                        var address = nativeObjects[nativeObjectsArrayIndex].nativeObjectAddress;
                         m_FindManagedObjectOfNativeObjectLUT[address] = n;
                     }
                 }
             }
 
-            int index;
-            if (m_FindManagedObjectOfNativeObjectLUT.TryGetValue(nativeObjectAddress, out index))
+            if (m_FindManagedObjectOfNativeObjectLUT.TryGetValue(nativeObjectAddress, out var index))
                 return index;
 
-            return -1;
+            return null;
         }
 
         /// <summary>
@@ -198,10 +198,10 @@ namespace HeapExplorer
         /// </summary>
         /// <param name="managedObjectAddress">The managed object address.</param>
         /// <returns>An index into the snapshot.managedObjects array on success, -1 otherwise.</returns>
-        public int FindManagedObjectOfAddress(UInt64 managedObjectAddress)
+        public PackedManagedObject.ArrayIndex? FindManagedObjectOfAddress(UInt64 managedObjectAddress)
         {
             if (managedObjectAddress == 0)
-                return -1;
+                throw new ArgumentException("address should not be 0", nameof(managedObjectAddress));
 
             if (m_FindManagedObjectOfAddressLUT == null)
             {
@@ -214,42 +214,39 @@ namespace HeapExplorer
             if (m_FindManagedObjectOfAddressLUT.TryGetValue(managedObjectAddress, out index))
                 return index;
 
-            return -1;
+            return null;
         }
 
         /// <summary>
         /// Find the native object at the specified address.
         /// </summary>
         /// <param name="nativeObjectAddress">The native object address.</param>
-        /// <returns>An index into the snapshot.nativeObjects array on success, -1 otherwise.</returns>
-        public int FindNativeObjectOfAddress(UInt64 nativeObjectAddress)
+        /// <returns>An index into the <see cref="nativeObjects"/> array on success, `None` otherwise.</returns>
+        public Option<int> FindNativeObjectOfAddress(UInt64 nativeObjectAddress)
         {
-            if (nativeObjectAddress == 0)
-                return -1;
+            if (nativeObjectAddress == 0) throw new ArgumentException(
+                "address can't be 0", nameof(nativeObjectAddress)
+            );
 
             if (m_FindNativeObjectOfAddressLUT == null)
             {
                 m_FindNativeObjectOfAddressLUT = new Dictionary<ulong, int>(nativeObjects.Length);
                 for (int n = 0, nend = nativeObjects.Length; n < nend; ++n)
-                    m_FindNativeObjectOfAddressLUT[(ulong)nativeObjects[n].nativeObjectAddress] = n;
+                    m_FindNativeObjectOfAddressLUT[nativeObjects[n].nativeObjectAddress] = n;
             }
 
-            int index;
-            if (m_FindNativeObjectOfAddressLUT.TryGetValue(nativeObjectAddress, out index))
-                return index;
-
-            return -1;
+            return m_FindNativeObjectOfAddressLUT.get(nativeObjectAddress);
         }
 
         /// <summary>
         /// Find the GCHandle at the specified address.
         /// </summary>
         /// <param name="targetAddress">The corresponding managed object address.</param>
-        /// <returns>An index into the snapshot.gcHandles array on success, -1 otherwise.</returns>
-        public int FindGCHandleOfTargetAddress(UInt64 targetAddress)
+        /// <returns>An index into the <see cref="gcHandles"/> array on success, `None` otherwise.</returns>
+        public Option<int> FindGCHandleOfTargetAddress(UInt64 targetAddress)
         {
             if (targetAddress == 0)
-                return -1;
+                throw new ArgumentException("address should not be 0", nameof(targetAddress));
 
             if (m_FindGCHandleOfTargetAddressLUT == null)
             {
@@ -258,23 +255,22 @@ namespace HeapExplorer
                     m_FindGCHandleOfTargetAddressLUT[gcHandles[n].target] = gcHandles[n].gcHandlesArrayIndex;
             }
 
-            int index;
-            if (m_FindGCHandleOfTargetAddressLUT.TryGetValue(targetAddress, out index))
-                return index;
-
-            return -1;
+            return m_FindGCHandleOfTargetAddressLUT.get(targetAddress);
         }
 
         /// <summary>
         /// Find the managed type of the address where the TypeInfo is stored.
         /// </summary>
         /// <param name="typeInfoAddress">The type info address.</param>
-        /// <returns>An index into the snapshot.managedTypes array on success, -1 otherwise.</returns>
-        public int FindManagedTypeOfTypeInfoAddress(UInt64 typeInfoAddress)
+        /// <returns>An index into the <see cref="managedTypes"/> array on success, `None` otherwise.</returns>
+        public Option<int> FindManagedTypeOfTypeInfoAddress(UInt64 typeInfoAddress)
         {
-            if (typeInfoAddress == 0)
-                return -1;
+            if (typeInfoAddress == 0) {
+                Error("HeapExplorer: FindManagedTypeOfTypeInfoAddress() received `typeInfoAddress` which was 0.");
+                return new Option<int>();
+            }
 
+            // Initialize the Look Up Table if it's not initialized.
             if (m_FindManagedTypeOfTypeInfoAddressLUT == null)
             {
                 m_FindManagedTypeOfTypeInfoAddressLUT = new Dictionary<ulong, int>(managedTypes.Length);
@@ -282,19 +278,15 @@ namespace HeapExplorer
                     m_FindManagedTypeOfTypeInfoAddressLUT[managedTypes[n].typeInfoAddress] = managedTypes[n].managedTypesArrayIndex;
             }
 
-            int index;
-            if (m_FindManagedTypeOfTypeInfoAddressLUT.TryGetValue(typeInfoAddress, out index))
-                return index;
-
-            return -1;
+            return m_FindManagedTypeOfTypeInfoAddressLUT.get(typeInfoAddress);
         }
 
         /// <summary>
         /// Find the managed heap section of the specified address.
         /// </summary>
         /// <param name="address">The memory address.</param>
-        /// <returns>An index into the snapshot.managedHeapSections array on success, -1 otherwise.</returns>
-        public int FindHeapOfAddress(UInt64 address)
+        /// <returns>An index into the <see cref="managedHeapSections"/> array on success, `None` otherwise.</returns>
+        public Option<int> FindHeapOfAddress(UInt64 address)
         {
             var first = 0;
             var last = managedHeapSections.Length - 1;
@@ -303,137 +295,114 @@ namespace HeapExplorer
             {
                 var mid = (first + last) >> 1;
                 var section = managedHeapSections[mid];
-                var end = section.startAddress + (ulong)section.bytes.Length;
 
-                if (address >= section.startAddress && address < end)
-                    return mid;
+                if (section.containsAddress(address))
+                    return Some(mid);
                 else if (address < section.startAddress)
                     last = mid - 1;
                 else if (address > section.startAddress)
                     first = mid + 1;
             }
 
-            return -1;
+            // Debug code - try linear search to see if algorithm is broken.
+            {
+                var sectionCount = managedHeapSections.Length;
+                for (var index = 0; index < sectionCount; index++) {
+                    if (managedHeapSections[index].containsAddress(address)) {
+                        Warning(
+                            "HeapExplorer: FindHeapOfAddress({0}) - binary search has failed, but linear search "
+                            + "succeeded, this indicated a bug in the algorithm.", address
+                        );
+                        return Some(index);
+                    }
+                }
+            }
+
+            return new Option<int>();
         }
 
         /// <summary>
         /// Add a connection between two objects, such as a connection from a native object to its managed counter-part.
         /// </summary>
-        /// <param name="fromKind">The connection kind, that is pointing to another object.</param>
-        /// <param name="fromIndex">An index into a snapshot array, depending on specified fromKind. If the kind would be 'Native', then it must be an index into the snapshot.nativeObjects array.</param>
-        /// <param name="toKind">The connection kind, to which the 'from' object is pointing to.</param>
-        /// <param name="toIndex">An index into a snapshot array, depending on the specified toKind. If the kind would be 'Native', then it must be an index into the snapshot.nativeObjects array.</param>
-        public void AddConnection(PackedConnection.Kind fromKind, int fromIndex, PackedConnection.Kind toKind, int toIndex)
-        {
-            var connection = new PackedConnection
-            {
-                fromKind = fromKind,
-                from = fromIndex,
-                toKind = toKind,
-                to = toIndex
-            };
+        public void AddConnection(PackedConnection.Pair from, PackedConnection.Pair to) {
+            var connection = new PackedConnection(from, to);
 
-            if (connection.fromKind != PackedConnection.Kind.None && connection.from != -1)
-            {
-                var key = ComputeConnectionKey(connection.fromKind, connection.from);
+            addTo(from.ComputeConnectionKey(), m_ConnectionsFrom);
+            addTo(to.ComputeConnectionKey(), m_ConnectionsTo);
 
-                List<PackedConnection> list;
-                if (!m_ConnectionsFrom.TryGetValue(key, out list))
-                    m_ConnectionsFrom[key] = list = new List<PackedConnection>(1); // Capacity=1 to reduce memory usage on HUGE memory snapshots
-
-                list.Add(connection);
-            }
-
-            if (connection.toKind != PackedConnection.Kind.None && connection.to != -1)
-            {
-                if (connection.to < 0)
-                    connection.to = -connection.to;
-
-                var key = ComputeConnectionKey(connection.toKind, connection.to);
-
-                List<PackedConnection> list;
-                if (!m_ConnectionsTo.TryGetValue(key, out list))
-                    m_ConnectionsTo[key] = list = new List<PackedConnection>(1); // Capacity=1 to reduce memory usage on HUGE memory snapshots
-
+            void addTo<K>(K key, Dictionary<K, List<PackedConnection>> dict) {
+                var list = dict.getOrUpdate(key, _ => 
+                    // Capacity=1 to reduce memory usage on HUGE memory snapshots
+                    new List<PackedConnection>(1)
+                );
                 list.Add(connection);
             }
         }
 
-        ulong ComputeConnectionKey(PackedConnection.Kind kind, int index)
-        {
-            var value = (((ulong)kind << 50) + (ulong)index);
-            return value;
-        }
-
-        void GetConnectionsInternal(PackedConnection.Kind kind, int index, List<PackedConnection> references, List<PackedConnection> referencedBy)
-        {
-            var key = ComputeConnectionKey(kind, index);
+        void GetConnectionsInternal(
+            PackedConnection.Pair pair, List<PackedConnection> references, List<PackedConnection> referencedBy
+        ) {
+            var key = pair.ComputeConnectionKey();
 
             if (references != null)
             {
-                List<PackedConnection> refs;
-                if (m_ConnectionsFrom.TryGetValue(key, out refs))
+                if (m_ConnectionsFrom.TryGetValue(key, out var refs))
                     references.AddRange(refs);
             }
 
             if (referencedBy != null)
             {
-                List<PackedConnection> refsBy;
-                if (m_ConnectionsTo.TryGetValue(key, out refsBy))
+                if (m_ConnectionsTo.TryGetValue(key, out var refsBy))
                     referencedBy.AddRange(refsBy);
             }
         }
 
-        public void GetConnectionsCount(PackedConnection.Kind kind, int index, out int referencesCount, out int referencedByCount)
+        public void GetConnectionsCount(PackedConnection.Pair pair, out int referencesCount, out int referencedByCount)
         {
             referencesCount = 0;
             referencedByCount = 0;
 
-            var key = ComputeConnectionKey(kind, index);
+            var key = pair.ComputeConnectionKey();
 
-            List<PackedConnection> refs;
-            if (m_ConnectionsFrom.TryGetValue(key, out refs))
+            if (m_ConnectionsFrom.TryGetValue(key, out var refs))
                 referencesCount = refs.Count;
 
-            List<PackedConnection> refBy;
-            if (m_ConnectionsTo.TryGetValue(key, out refBy))
+            if (m_ConnectionsTo.TryGetValue(key, out var refBy))
                 referencedByCount = refBy.Count;
         }
 
-        public void GetConnections(PackedManagedStaticField staticField, List<PackedConnection> references, List<PackedConnection> referencedBy)
+        public void GetConnections(
+            PackedManagedStaticField staticField, List<PackedConnection> references, List<PackedConnection> referencedBy
+        )
         {
-            var index = staticField.staticFieldsArrayIndex;
-            if (index == -1)
-                return;
-
-            GetConnectionsInternal(PackedConnection.Kind.StaticField, index, references, referencedBy);
+            GetConnectionsInternal(
+                new PackedConnection.Pair(PackedConnection.Kind.StaticField, staticField.staticFieldsArrayIndex), 
+                references, referencedBy
+            );
         }
 
         public void GetConnections(PackedNativeUnityEngineObject nativeObj, List<PackedConnection> references, List<PackedConnection> referencedBy)
         {
-            var index = nativeObj.nativeObjectsArrayIndex;
-            if (index == -1)
-                return;
-
-            GetConnectionsInternal(PackedConnection.Kind.Native, index, references, referencedBy);
+            GetConnectionsInternal(
+                new PackedConnection.Pair(PackedConnection.Kind.Native, nativeObj.nativeObjectsArrayIndex),
+                references, referencedBy
+            );
         }
 
         public void GetConnections(PackedGCHandle gcHandle, List<PackedConnection> references, List<PackedConnection> referencedBy)
         {
-            var index = gcHandle.gcHandlesArrayIndex;
-            if (index == -1)
-                return;
-
-            GetConnectionsInternal(PackedConnection.Kind.GCHandle, index, references, referencedBy);
+            GetConnectionsInternal(
+                new PackedConnection.Pair(PackedConnection.Kind.GCHandle, gcHandle.gcHandlesArrayIndex), 
+                references, referencedBy
+            );
         }
 
         public void GetConnections(PackedManagedObject managedObject, List<PackedConnection> references, List<PackedConnection> referencedBy)
         {
-            var index = managedObject.managedObjectsArrayIndex;
-            if (index == -1)
-                return;
-
-            GetConnectionsInternal(PackedConnection.Kind.Managed, index, references, referencedBy);
+            GetConnectionsInternal(
+                managedObject.managedObjectsArrayIndex.asPair, 
+                references, referencedBy
+            );
         }
 
         public void GetConnections(PackedMemorySection memorySection, List<PackedConnection> references, List<PackedConnection> referencedBy)
@@ -470,30 +439,28 @@ namespace HeapExplorer
         }
 
         // TODO: this costs 500ms in wolf4
-        public int FindNativeMonoScriptType(int nativeObjectIndex, out string monoScriptName)
+        public Option<(int index, string monoScriptName)> FindNativeMonoScriptType(int nativeObjectIndex)
         {
-            monoScriptName = "";
+            var key = new PackedConnection.Pair(PackedConnection.Kind.Native, nativeObjectIndex).ComputeConnectionKey();
 
-            var key = ComputeConnectionKey(PackedConnection.Kind.Native, nativeObjectIndex);
-
-            List<PackedConnection> list;
-            if (m_ConnectionsFrom.TryGetValue(key, out list))
+            if (!m_ConnectionsFrom.TryGetValue(key, out var list)) return None._;
+            for (int n = 0, nend = list.Count; n < nend; ++n)
             {
-                for (int n = 0, nend = list.Count; n < nend; ++n)
-                {
-                    var connection = list[n];
+                var connection = list[n];
 
-                    // Check if the connection points to a MonoScript
-                    var isPointingToMonoScript = connection.toKind == PackedConnection.Kind.Native && nativeObjects[connection.to].nativeTypesArrayIndex == coreTypes.nativeMonoScript;
-                    if (!isPointingToMonoScript)
-                        continue;
+                // Check if the connection points to a MonoScript
+                var isPointingToMonoScript = 
+                    connection.to.kind == PackedConnection.Kind.Native 
+                    && nativeObjects[connection.to.index].nativeTypesArrayIndex == coreTypes.nativeMonoScript;
+                if (!isPointingToMonoScript)
+                    continue;
 
-                    monoScriptName = nativeObjects[connection.to].name;
-                    return nativeObjects[connection.to].nativeTypesArrayIndex;
-                }
+                var index = nativeObjects[connection.to.index].nativeTypesArrayIndex;
+                var monoScriptName = nativeObjects[connection.to.index].name;
+                return Some((index, monoScriptName));
             }
 
-            return -1;
+            return None._;
         }
 
         public bool IsEnum(PackedManagedType type)
@@ -597,7 +564,10 @@ namespace HeapExplorer
             for (int n = 0, nend = connections.Length; n < nend; ++n)
             {
                 // Check if the connection points to a MonoScript
-                var isPointingToMonoScript = connections[n].toKind == PackedConnection.Kind.Native && nativeObjects[connections[n].to].nativeTypesArrayIndex == nativeMonoScriptTypeIndex;
+                var isPointingToMonoScript = 
+                    connections[n].to.kind == PackedConnection.Kind.Native 
+                    && nativeObjects[connections[n].to.index].nativeTypesArrayIndex == nativeMonoScriptTypeIndex;
+                
                 if (isPointingToMonoScript)
                     list.Add(n);
             }
@@ -617,7 +587,7 @@ namespace HeapExplorer
                 if ((n % (nend / 100)) == 0)
                 {
                     var progress = ((n + 1.0f) / nend) * 100;
-                    busyString = string.Format("Analyzing Object Connections\n{0}/{1}, {2:F0}% done", n + 1, connections.Length, progress);
+                    busyString = $"Analyzing Object Connections\n{n + 1}/{connections.Length}, {progress:F0}% done";
 
                     if (abortActiveStepRequested)
                         break;
@@ -625,7 +595,7 @@ namespace HeapExplorer
 
                 var connection = connections[n];
 
-                AddConnection(connection.fromKind, connection.from, connection.toKind, connection.to);
+                AddConnection(connection.from, connection.to);
 
                 //if (connection.fromKind == PackedConnection.Kind.Native || nativeObjects[connection.from].nativeObjectAddress == 0x8E9D4FD0)
                 //    fromCount++;
@@ -653,7 +623,7 @@ namespace HeapExplorer
                 if ((n % (nend / 100)) == 0)
                 {
                     var progress = ((n + 1.0f) / nend) * 100;
-                    busyString = string.Format("Analyzing Object Connections\n{0}/{1}, {2:F0}% done", n + 1, connections.Length, progress);
+                    busyString = $"Analyzing Object Connections\n{n + 1}/{connections.Length}, {progress:F0}% done";
 
                     if (abortActiveStepRequested)
                         break;
@@ -739,7 +709,7 @@ namespace HeapExplorer
             {
                 managedTypes[n].isUnityEngineObject = IsSubclassOf(managedTypes[n], coreTypes.unityEngineObject);
                 managedTypes[n].containsFieldOfReferenceType = ContainsFieldOfReferenceType(managedTypes[n]);
-                managedTypes[n].containsFieldOfReferenceTypeInInheritenceChain = ContainsFieldOfReferenceTypeInInheritanceChain(managedTypes[n]);
+                managedTypes[n].containsFieldOfReferenceTypeInInheritanceChain = ContainsFieldOfReferenceTypeInInheritanceChain(managedTypes[n]);
             }
         }
 

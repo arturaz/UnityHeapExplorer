@@ -31,11 +31,10 @@ namespace HeapExplorer
             }
 
             // it is a new section, try to find it
-            var heapIndex = m_Snapshot.FindHeapOfAddress(address);
-            if (heapIndex == -1)
+            if (!m_Snapshot.FindHeapOfAddress(address).valueOut(out var heapIndex))
             {
                 Debug.LogWarningFormat("HeapExplorer: Heap at {0:X} not found. Haven't figured out why this happens yet. Perhaps related to .NET4 ScriptingRuntime?", address);
-                return -1;
+                return new Option<int>();
             }
 
             // setup new section
@@ -343,7 +342,7 @@ namespace HeapExplorer
 
             const int kMaxStringLength = 1024 * 1024 * 10;
             if (length > kMaxStringLength)
-                return string.Format("<error: length greater {0} bytes>", kMaxStringLength);
+                return $"<error: length greater {kMaxStringLength} bytes>";
 
             offset += sizeof(System.Int32); // the length data aka sizeof(int)
             length *= sizeof(char); // length is specified in characters, but each char is 2 bytes wide
@@ -518,7 +517,7 @@ namespace HeapExplorer
                 return ReadByte(address).ToString();
 
             if (type.managedTypesArrayIndex == m_Snapshot.coreTypes.systemChar)
-                return string.Format("'{0}'", ReadChar(address));
+                return $"'{ReadChar(address)}'";
 
             if (type.managedTypesArrayIndex == m_Snapshot.coreTypes.systemBoolean)
                 return ReadBoolean(address).ToString();
@@ -528,10 +527,10 @@ namespace HeapExplorer
                 var v = ReadSingle(address);
 
                 if (float.IsNaN(v)) return "float.NaN";
-                if (v == float.MinValue) return string.Format("float.MinValue ({0:E})", v);
-                if (v == float.MaxValue) return string.Format("float.MaxValue ({0:E})", v);
-                if (float.IsPositiveInfinity(v)) return string.Format("float.PositiveInfinity ({0:E})", v);
-                if (float.IsNegativeInfinity(v)) return string.Format("float.NegativeInfinity ({0:E})", v);
+                if (v == float.MinValue) return $"float.MinValue ({v:E})";
+                if (v == float.MaxValue) return $"float.MaxValue ({v:E})";
+                if (float.IsPositiveInfinity(v)) return $"float.PositiveInfinity ({v:E})";
+                if (float.IsNegativeInfinity(v)) return $"float.NegativeInfinity ({v:E})";
                 if (v > 10000000 || v < -10000000) return v.ToString("E"); // If it's a big number, use scientified notation
 
                 return v.ToString("F");
@@ -542,10 +541,10 @@ namespace HeapExplorer
                 var v = ReadDouble(address);
 
                 if (double.IsNaN(v)) return "double.NaN";
-                if (v == double.MinValue) return string.Format("double.MinValue ({0:E})", v);
-                if (v == double.MaxValue) return string.Format("double.MaxValue ({0:E})", v);
-                if (double.IsPositiveInfinity(v)) return string.Format("double.PositiveInfinity ({0:E})", v);
-                if (double.IsNegativeInfinity(v)) return string.Format("double.NegativeInfinity ({0:E})", v);
+                if (v == double.MinValue) return $"double.MinValue ({v:E})";
+                if (v == double.MaxValue) return $"double.MaxValue ({v:E})";
+                if (double.IsPositiveInfinity(v)) return $"double.PositiveInfinity ({v:E})";
+                if (double.IsNegativeInfinity(v)) return $"double.NegativeInfinity ({v:E})";
                 if (v > 10000000 || v < -10000000) return v.ToString("E"); // If it's a big number, use scientified notation
 
                 return v.ToString("G");

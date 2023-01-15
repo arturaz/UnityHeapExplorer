@@ -66,11 +66,8 @@ namespace HeapExplorer
 
             OnInitialize();
 
-            var text = string.Format("{0} {1} = {2}\n\n{3}",
-                displayType,
-                displayName,
-                displayValue,
-                PackedManagedTypeUtility.GetInheritanceAsString(m_Snapshot, type.managedTypesArrayIndex));
+            var text =
+                $"{displayType} {displayName} = {displayValue}\n\n{PackedManagedTypeUtility.GetInheritanceAsString(m_Snapshot, type.managedTypesArrayIndex)}";
 
             this.tooltip = text.Trim();
         }

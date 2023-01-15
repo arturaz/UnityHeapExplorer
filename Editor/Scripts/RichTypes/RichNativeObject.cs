@@ -2,198 +2,67 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
-using System.Collections;
+
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 
 namespace HeapExplorer
 {
-    public struct RichNativeObject
+    /// <summary>
+    /// An <see cref="PackedNativeUnityEngineObject"/> index validated against a <see cref="PackedMemorySnapshot"/>.
+    /// </summary>
+    public readonly struct RichNativeObject
     {
         public RichNativeObject(PackedMemorySnapshot snapshot, int nativeObjectsArrayIndex)
-            : this()
         {
-            m_Snapshot = snapshot;
-            m_NativeObjectArrayIndex = nativeObjectsArrayIndex;
+            if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
+            if (nativeObjectsArrayIndex < 0 || nativeObjectsArrayIndex >= snapshot.nativeObjects.Length)
+                throw new ArgumentOutOfRangeException(
+                    $"nativeObjectsArrayIndex ({nativeObjectsArrayIndex})is out of bounds [0..{snapshot.nativeObjects.Length})"
+                );
+            this.snapshot = snapshot;
+            this.nativeObjectsArrayIndex = nativeObjectsArrayIndex;
         }
 
-        public PackedNativeUnityEngineObject packed
-        {
-            get
-            {
-                if (!isValid)
-                    return new PackedNativeUnityEngineObject() { nativeObjectsArrayIndex = -1, nativeTypesArrayIndex = -1, managedObjectsArrayIndex = -1 };
+        public PackedNativeUnityEngineObject packed => snapshot.nativeObjects[nativeObjectsArrayIndex];
 
-                return m_Snapshot.nativeObjects[m_NativeObjectArrayIndex];
-            }
-        }
+        public RichNativeType type => new RichNativeType(snapshot, packed.nativeTypesArrayIndex);
 
-        public PackedMemorySnapshot snapshot
-        {
-            get
-            {
-                return m_Snapshot;
-            }
-        }
+        public RichManagedObject? managedObject =>
+            packed.managedObjectsArrayIndex.valueOut(out var index)
+                    ? new RichManagedObject(snapshot, index)
+                    : (RichManagedObject?) null;
 
-        public bool isValid
-        {
-            get
-            {
-                return m_Snapshot != null && m_NativeObjectArrayIndex >= 0 && m_NativeObjectArrayIndex < m_Snapshot.nativeObjects.Length;
-            }
-        }
+        public RichGCHandle? gcHandle => managedObject?.gcHandle;
 
-        public RichNativeType type
-        {
-            get
-            {
-                if (!isValid)
-                    return RichNativeType.invalid;
+        public string name => packed.name;
 
-                var obj = m_Snapshot.nativeObjects[m_NativeObjectArrayIndex];
-                return new RichNativeType(m_Snapshot, obj.nativeTypesArrayIndex);
-            }
-        }
+        public ulong address => packed.nativeObjectAddress;
 
-        public RichManagedObject managedObject
-        {
-            get
-            {
-                if (!isValid)
-                    return RichManagedObject.invalid;
+        public HideFlags hideFlags => packed.hideFlags;
 
-                var native = m_Snapshot.nativeObjects[m_NativeObjectArrayIndex];
-                if (native.managedObjectsArrayIndex < 0)
-                    return RichManagedObject.invalid;
+        public int instanceId => packed.instanceId;
 
-                return new RichManagedObject(m_Snapshot, native.managedObjectsArrayIndex);
-            }
-        }
+        public bool isDontDestroyOnLoad => packed.isDontDestroyOnLoad;
 
-        public RichGCHandle gcHandle
-        {
-            get
-            {
-                return managedObject.gcHandle;
-            }
-        }
+        public bool isManager => packed.isManager;
 
-        public string name
-        {
-            get
-            {
-                if (!isValid)
-                    return "<invalid>";
+        public bool isPersistent => packed.isPersistent;
 
-                return m_Snapshot.nativeObjects[m_NativeObjectArrayIndex].name;
-            }
-        }
-
-        public System.UInt64 address
-        {
-            get
-            {
-                if (!isValid)
-                    return 0;
-
-                return (System.UInt64)m_Snapshot.nativeObjects[m_NativeObjectArrayIndex].nativeObjectAddress;
-            }
-        }
-
-        public HideFlags hideFlags
-        {
-            get
-            {
-                if (!isValid)
-                    return HideFlags.None;
-
-                return m_Snapshot.nativeObjects[m_NativeObjectArrayIndex].hideFlags;
-            }
-        }
-
-        public int instanceId
-        {
-            get
-            {
-                if (!isValid)
-                    return 0;
-
-                return m_Snapshot.nativeObjects[m_NativeObjectArrayIndex].instanceId;
-            }
-        }
-
-        public bool isDontDestroyOnLoad
-        {
-            get
-            {
-                if (!isValid)
-                    return true;
-
-                return m_Snapshot.nativeObjects[m_NativeObjectArrayIndex].isDontDestroyOnLoad;
-            }
-        }
-
-        public bool isManager
-        {
-            get
-            {
-                if (!isValid)
-                    return false;
-
-                return m_Snapshot.nativeObjects[m_NativeObjectArrayIndex].isManager;
-            }
-        }
-
-        public bool isPersistent
-        {
-            get
-            {
-                if (!isValid)
-                    return false;
-
-                return m_Snapshot.nativeObjects[m_NativeObjectArrayIndex].isPersistent;
-            }
-        }
-
-        public ulong size
-        {
-            get
-            {
-                if (!isValid)
-                    return 0;
-
-                return m_Snapshot.nativeObjects[m_NativeObjectArrayIndex].size;
-            }
-        }
+        public ulong size => packed.size;
 
         public void GetConnections(List<PackedConnection> references, List<PackedConnection> referencedBy)
         {
-            if (!isValid)
-                return;
-
-            m_Snapshot.GetConnections(packed, references, referencedBy);
+            snapshot.GetConnections(packed, references, referencedBy);
         }
 
         public void GetConnectionsCount(out int referencesCount, out int referencedByCount)
         {
-            if (!isValid)
-            {
-                referencesCount = 0;
-                referencedByCount = 0;
-                return;
-            }
-
-            m_Snapshot.GetConnectionsCount(PackedConnection.Kind.Native, m_NativeObjectArrayIndex, out referencesCount, out referencedByCount);
+            snapshot.GetConnectionsCount(PackedConnection.Kind.Native, nativeObjectsArrayIndex, out referencesCount, out referencedByCount);
         }
 
-        public static readonly RichNativeObject invalid = new RichNativeObject()
-        {
-            m_Snapshot = null,
-            m_NativeObjectArrayIndex = -1
-        };
-
-        PackedMemorySnapshot m_Snapshot;
-        int m_NativeObjectArrayIndex;
+        public readonly PackedMemorySnapshot snapshot;
+        public readonly int nativeObjectsArrayIndex;
     }
 }

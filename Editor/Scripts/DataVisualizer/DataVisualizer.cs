@@ -48,7 +48,7 @@ namespace HeapExplorer
             m_Address = address;
             m_Type = type;
             m_MemoryReader = memoryReader;
-            m_Title = string.Format("{0} Visualizer", type.name);
+            m_Title = $"{type.name} Visualizer";
 
             OnInitialize();
         }
@@ -245,7 +245,7 @@ namespace HeapExplorer
             if (m_ShortString != null)
             {
                 text = m_ShortString;
-                EditorGUILayout.HelpBox(string.Format("Displaying {0} chars only!", k_MaxStringLength), MessageType.Info);
+                EditorGUILayout.HelpBox($"Displaying {k_MaxStringLength} chars only!", MessageType.Info);
             }
 
             EditorGUILayout.TextArea(text, EditorStyles.wordWrappedLabel);

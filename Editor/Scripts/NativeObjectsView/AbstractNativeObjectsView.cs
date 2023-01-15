@@ -163,7 +163,7 @@ namespace HeapExplorer
 
         public override void RestoreCommand(GotoCommand command)
         {
-            if (command.toNativeObject.isValid)
+            if (command.toNativeObject.HasValue)
             {
                 m_NativeObjectsControl.Select(command.toNativeObject.packed);
                 return;

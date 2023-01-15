@@ -313,7 +313,7 @@ namespace HeapExplorer
                 get
                 {
                     var nativeObj = m_Object.nativeObject;
-                    if (nativeObj.isValid)
+                    if (nativeObj.HasValue)
                         return nativeObj.name;
 
                     return "";
@@ -378,7 +378,7 @@ namespace HeapExplorer
                     //    }
                     //}
 
-                    if (m_Object.nativeObject.isValid)
+                    if (m_Object.nativeObject.HasValue)
                     {
                         if (HeEditorGUI.CppButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
@@ -394,7 +394,7 @@ namespace HeapExplorer
                         break;
 
                     case Column.CppCounterpart:
-                        if (m_Object.nativeObject.isValid)
+                        if (m_Object.nativeObject.HasValue)
                             GUI.Label(position, m_Object.nativeObject.name);
                         break;
 

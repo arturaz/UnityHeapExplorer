@@ -2,94 +2,45 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEditor;
+
+using System;
 
 namespace HeapExplorer
 {
-    public struct RichNativeType
+    /// <summary>
+    /// An <see cref="PackedNativeType"/> index validated against a <see cref="PackedMemorySnapshot"/>.
+    /// </summary>
+    public readonly struct RichNativeType
     {
         public RichNativeType(PackedMemorySnapshot snapshot, int nativeTypesArrayIndex)
-            : this()
         {
-            m_Snapshot = snapshot;
-            m_NativeTypesArrayIndex = nativeTypesArrayIndex;
+            if (snapshot == null) throw new ArgumentNullException(nameof(snapshot));
+            if (nativeTypesArrayIndex < 0 || nativeTypesArrayIndex >= snapshot.nativeTypes.Length)
+                throw new ArgumentOutOfRangeException(
+                    $"nativeTypesArrayIndex ({nativeTypesArrayIndex}) is out of bounds [0..{snapshot.nativeTypes.Length})"
+                );
+            
+            this.snapshot = snapshot;
+            this.nativeTypesArrayIndex = nativeTypesArrayIndex;
         }
 
-        public PackedNativeType packed
+        public PackedNativeType packed => snapshot.nativeTypes[nativeTypesArrayIndex];
+        public string name => packed.name;
+
+        public RichNativeType? baseType
         {
-            get
-            {
-                if (!isValid)
-                    return new PackedNativeType() { nativeTypeArrayIndex = -1, nativeBaseTypeArrayIndex = -1, name = "" };
-
-                return m_Snapshot.nativeTypes[m_NativeTypesArrayIndex];
-            }
-        }
-
-        public PackedMemorySnapshot snapshot
-        {
-            get
-            {
-                return m_Snapshot;
-            }
-        }
-
-        public bool isValid
-        {
-            get
-            {
-                return m_Snapshot != null && m_NativeTypesArrayIndex >= 0 && m_NativeTypesArrayIndex < m_Snapshot.nativeTypes.Length;
-            }
-        }
-
-        public string name
-        {
-            get
-            {
-                if (!isValid)
-                    return "<unknown type>";
-
-                var t = m_Snapshot.nativeTypes[m_NativeTypesArrayIndex];
-                return t.name;
-            }
-        }
-
-        public RichNativeType baseType
-        {
-            get
-            {
-                if (!isValid)
-                    return RichNativeType.invalid;
-
-                var t = m_Snapshot.nativeTypes[m_NativeTypesArrayIndex];
-                if (t.nativeBaseTypeArrayIndex < 0)
-                    return RichNativeType.invalid;
-
-                return new RichNativeType(m_Snapshot, t.nativeBaseTypeArrayIndex);
+            get {
+                var t = packed;
+                return t.nativeBaseTypeArrayIndex < 0 ? null : new RichNativeType(snapshot, t.nativeBaseTypeArrayIndex);
             }
         }
 
         /// <summary>
         /// Gets whether this native type is a subclass of the specified baseType.
         /// </summary>
-        public bool IsSubclassOf(int baseTypeIndex)
-        {
-            if (!isValid || baseTypeIndex < 0)
-                return false;
+        public bool IsSubclassOf(int baseTypeIndex) => snapshot.IsSubclassOf(packed, baseTypeIndex);
 
-            return m_Snapshot.IsSubclassOf(m_Snapshot.nativeTypes[m_NativeTypesArrayIndex], baseTypeIndex);
-        }
-
-        public static readonly RichNativeType invalid = new RichNativeType()
-        {
-            m_Snapshot = null,
-            m_NativeTypesArrayIndex = -1
-        };
-
-        PackedMemorySnapshot m_Snapshot;
-        int m_NativeTypesArrayIndex;
+        public readonly PackedMemorySnapshot snapshot;
+        public readonly int nativeTypesArrayIndex;
     }
 }

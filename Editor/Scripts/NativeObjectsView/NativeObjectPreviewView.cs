@@ -77,16 +77,16 @@ namespace HeapExplorer
             m_PreviewTime = Time.realtimeSinceStartup;
             m_Object = new RichNativeObject(snapshot, obj.nativeObjectsArrayIndex);
 
-            if (autoLoad && m_Object.isValid && m_Object.isPersistent)
+            if (autoLoad && m_Object.HasValue && m_Object.isPersistent)
                 LoadAssetPreviews();
         }
 
         void LoadAssetPreviews()
         {
-            if (!m_Object.isValid)
+            if (!m_Object.HasValue)
                 return;
 
-            m_Guids = new List<string>(AssetDatabase.FindAssets(string.Format("t:{0} {1}", m_Object.type.name, m_Object.name)));
+            m_Guids = new List<string>(AssetDatabase.FindAssets($"t:{m_Object.type.name} {m_Object.name}"));
             m_LoadPreview = true;
             window.Repaint();
         }
@@ -137,7 +137,7 @@ namespace HeapExplorer
                 return;
             }
 
-            if (!m_Object.isValid || !m_Object.isPersistent)
+            if (!m_Object.HasValue || !m_Object.isPersistent)
             {
                 DrawPreviewButtons(false);
 
@@ -202,7 +202,7 @@ namespace HeapExplorer
                 autoLoad = GUILayout.Toggle(autoLoad, new GUIContent(HeEditorStyles.previewAutoLoadImage, "Automatically preview assets."), HeEditorStyles.previewButton, GUILayout.Width(24));
                 if (EditorGUI.EndChangeCheck())
                 {
-                    if (m_Object.isValid)
+                    if (m_Object.HasValue)
                         Inspect(m_Object.packed);
                 }
 

@@ -41,7 +41,7 @@ namespace HeapExplorer
                     for (var n = 0; n < type.arrayRank; ++n)
                     {
                         var length = m_MemoryReader.ReadArrayLength(address, type, n);
-                        displayValue += string.Format("[{0}]", length);
+                        displayValue += $"[{length}]";
                     }
                 }
                 else
@@ -51,7 +51,7 @@ namespace HeapExplorer
                     {
                         var length = m_MemoryReader.ReadArrayLength(address, type, n);
 
-                        displayValue += string.Format("{0}", length);
+                        displayValue += $"{length}";
                         if (n + 1 < type.arrayRank)
                             displayValue += ",";
                     }
@@ -83,7 +83,7 @@ namespace HeapExplorer
             {
                 var child = children[n] as PropertyGridItem;
                 if (child != null)
-                    child.displayName = string.Format("[{0}]", n);
+                    child.displayName = $"[{n}]";
             }
         }
 
@@ -109,7 +109,7 @@ namespace HeapExplorer
                 {
                     var child = children[n] as PropertyGridItem;
                     if (child != null)
-                        child.displayName = string.Format("[{0},{1}]", y, x);
+                        child.displayName = $"[{y},{x}]";
 
                     x++;
                     if (x >= arrayLength2)
@@ -134,7 +134,7 @@ namespace HeapExplorer
                 {
                     var child = children[n] as PropertyGridItem;
                     if (child != null)
-                        child.displayName = string.Format("[{0},{1},{2}]", z, y, x);
+                        child.displayName = $"[{z},{y},{x}]";
 
                     x++;
                     if (x >= arrayLength2)

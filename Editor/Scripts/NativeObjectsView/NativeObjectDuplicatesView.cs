@@ -51,11 +51,8 @@ namespace HeapExplorer
 
             EditorGUILayout.LabelField(titleContent, EditorStyles.boldLabel);
 
-            var text = string.Format(
-                "{0} native UnityEngine object guessed duplicate(s) wasting {1} memory", 
-                m_NativeObjectsControl.nativeObjectsCount, 
-                EditorUtility.FormatBytes(m_NativeObjectsControl.nativeObjectsSize.ToLongClamped())
-            );
+            var text =
+                $"{m_NativeObjectsControl.nativeObjectsCount} native UnityEngine object guessed duplicate(s) wasting {EditorUtility.FormatBytes(m_NativeObjectsControl.nativeObjectsSize.ToLongClamped())} memory";
             window.SetStatusbarString(text);
         }
 

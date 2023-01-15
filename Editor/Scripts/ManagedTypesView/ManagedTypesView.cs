@@ -65,7 +65,7 @@ namespace HeapExplorer
 
         //public override int CanProcessCommand(GotoCommand command)
         //{
-        //    if (command.toGCHandle.isValid)
+        //    if (command.toGCHandle.HasValue)
         //        return 10;
 
         //    return base.CanProcessCommand(command);
@@ -102,7 +102,7 @@ namespace HeapExplorer
                     {
                         using (new EditorGUILayout.HorizontalScope())
                         {
-                            EditorGUILayout.LabelField(string.Format("{0} C# Type(s)", snapshot.managedTypes.Length), EditorStyles.boldLabel);
+                            EditorGUILayout.LabelField($"{snapshot.managedTypes.Length} C# Type(s)", EditorStyles.boldLabel);
 
                             if (m_TypesSearchField.OnToolbarGUI())
                                 m_TypesControl.Search(m_TypesSearchField.text);

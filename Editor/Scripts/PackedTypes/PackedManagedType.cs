@@ -2,10 +2,7 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
-using System.Collections;
-using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
 using System;
 using UnityEditor.Profiling.Memory.Experimental;
 
@@ -16,73 +13,99 @@ namespace HeapExplorer
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
     public struct PackedManagedType : PackedMemorySnapshot.TypeForSubclassSearch
     {
-        public static readonly PackedManagedType invalid = new PackedManagedType
-        {
-            managedTypesArrayIndex = -1,
-            nativeTypeArrayIndex = -1,
-            baseOrElementTypeIndex = -1
-        };
+        /// <summary>Is this type a value type? (if it's not a value type, it's a reference type)</summary>
+        public bool isValueType;
 
-        // Is this type a value type? (if it's not a value type, it's a reference type)
-        public System.Boolean isValueType;
+        /// <summary>Is this type an array?</summary>
+        public bool isArray;
 
-        // Is this type an array?
-        public System.Boolean isArray;
+        /// <summary>
+        /// If this is an arrayType, this will return the rank of the array. (1 for a 1-dimensional array, 2 for a
+        /// 2-dimensional array, etc)
+        /// </summary>
+        public int arrayRank;
 
-        // If this is an arrayType, this will return the rank of the array. (1 for a 1-dimensional array, 2 for a 2-dimensional array, etc)
-        public System.Int32 arrayRank;
+        /// <summary>
+        /// Name of this type.
+        /// </summary>
+        public string name;
 
-        // Name of this type.
-        public System.String name;
+        /// <summary>
+        /// Name of the assembly this type was loaded from.
+        /// </summary>
+        public string assembly;
 
-        // Name of the assembly this type was loaded from.
-        public System.String assembly;
-
-        // An array containing descriptions of all fields of this type.
+        /// <summary>
+        /// An array containing descriptions of all fields of this type.
+        /// </summary>
         public PackedManagedField[] fields;
 
         /// <summary>
         /// The actual contents of the bytes that store this types static fields, at the point of time when the
         /// snapshot was taken.
         /// </summary>
-        public System.Byte[] staticFieldBytes;
+        public byte[] staticFieldBytes;
 
-        // The base type for this type, pointed to by an index into PackedMemorySnapshot.typeDescriptions.
-        public System.Int32 baseOrElementTypeIndex;
+        /// <summary>
+        /// The base type for this type, pointed to by an index into <see cref="PackedMemorySnapshot.managedTypes"/>.
+        /// </summary>
+        public int baseOrElementTypeIndex;
 
-        // Size in bytes of an instance of this type. If this type is an arraytype, this describes the amount of bytes a single element in the array will take up.
-        public System.Int32 size;
+        /// <summary>
+        /// Size in bytes of an instance of this type. If this type is an array type, this describes the amount of
+        /// bytes a single element in the array will take up.
+        /// </summary>
+        public int size;
 
-        // The address in memory that contains the description of this type inside the virtual machine.
-        // This can be used to match managed objects in the heap to their corresponding TypeDescription, as the first pointer of a managed object points to its type description.
-        public System.UInt64 typeInfoAddress;
+        /// <summary>
+        /// The address in memory that contains the description of this type inside the virtual machine.
+        /// <para/>
+        /// This can be used to match managed objects in the heap to their corresponding TypeDescription, as the first
+        /// pointer of a managed object points to its type description.
+        /// </summary>
+        public ulong typeInfoAddress;
 
-        // The typeIndex of this type. This index is an index into the PackedMemorySnapshot.typeDescriptions array.
-        public System.Int32 managedTypesArrayIndex;
+        /// <summary>
+        /// This index is an index into the <see cref="PackedMemorySnapshot.managedTypes"/> array.
+        /// </summary>
+        public int managedTypesArrayIndex;
 
-        // if this managed type has a native counterpart
+        /// <summary>
+        /// Index into <see cref="PackedMemorySnapshot.nativeTypes"/> if this managed type has a native counterpart or
+        /// -1 otherwise.
+        /// </summary>
         [NonSerialized]
-        public System.Int32 nativeTypeArrayIndex;
+        public int nativeTypeArrayIndex;
 
-        // Number of all objects of this type.
+        /// <summary>
+        /// Number of all objects of this type.
+        /// </summary>
         [NonSerialized]
-        public System.Int32 totalObjectCount;
+        public int totalObjectCount;
 
-        // The size of all objects of this type.
+        /// <summary>
+        /// The size of all objects of this type.
+        /// </summary>
         [NonSerialized]
         public ulong totalObjectSize;
 
-        // gets whether the type derived from UnityEngine.Object
+        /// <summary>
+        /// Whether the type derived from <see cref="UnityEngine.Object"/>.
+        /// </summary>
         [NonSerialized]
-        public System.Boolean isUnityEngineObject;
+        public bool isUnityEngineObject;
 
-        // gets whether the type contains any field of ReferenceType
+        /// <summary>
+        /// Whether the type contains any field of ReferenceType
+        /// </summary>
         [NonSerialized]
-        public System.Boolean containsFieldOfReferenceType;
+        public bool containsFieldOfReferenceType;
 
-        // gets whether this or a base class contains any field of a ReferenceType
+        /// <summary>
+        /// Whether this or a base class contains any field of a ReferenceType.
+        /// </summary>
         [NonSerialized]
-        public System.Boolean containsFieldOfReferenceTypeInInheritenceChain;
+        public bool containsFieldOfReferenceTypeInInheritanceChain;
 
         /// <inheritdoc/>
         string PackedMemorySnapshot.TypeForSubclassSearch.name {
@@ -99,7 +122,9 @@ namespace HeapExplorer
             get { return baseOrElementTypeIndex; }
         }
         
-        // An array containing descriptions of all instance fields of this type.
+        /// <summary>
+        /// An array containing descriptions of all instance fields of this type.
+        /// </summary>
         public PackedManagedField[] instanceFields
         {
             get
@@ -134,7 +159,10 @@ namespace HeapExplorer
         }
         [NonSerialized] PackedManagedField[] m_InstanceFields;
 
-        // An array containing descriptions of all static fields of this type, NOT including static fields of base type.
+        /// <summary>
+        /// An array containing descriptions of all static fields of this type, NOT including static fields of base
+        /// type.
+        /// </summary>
         public PackedManagedField[] staticFields
         {
             get
@@ -206,9 +234,9 @@ namespace HeapExplorer
                     case "System.ValueType":
                     case "System.ReferenceType":
                         return true;
+                    default:
+                        return false;
                 }
-
-                return false;
             }
         }
 
@@ -227,9 +255,9 @@ namespace HeapExplorer
                     case "System.IntPtr":
                     case "System.UIntPtr":
                         return true;
+                    default:
+                        return false;
                 }
-
-                return false;
             }
         }
 
@@ -284,7 +312,7 @@ namespace HeapExplorer
             return false;
         }
 
-        const System.Int32 k_Version = 1;
+        const int k_Version = 1;
 
         public static void Write(System.IO.BinaryWriter writer, PackedManagedType[] value)
         {
@@ -299,7 +327,7 @@ namespace HeapExplorer
                 writer.Write(value[n].name);
                 writer.Write(value[n].assembly);
 
-                writer.Write((System.Int32)value[n].staticFieldBytes.Length);
+                writer.Write((int)value[n].staticFieldBytes.Length);
                 writer.Write(value[n].staticFieldBytes);
                 writer.Write(value[n].baseOrElementTypeIndex);
                 writer.Write(value[n].size);
@@ -319,7 +347,7 @@ namespace HeapExplorer
             if (version >= 1)
             {
                 var length = reader.ReadInt32();
-                stateString = string.Format("Loading {0} Managed Types", length);
+                stateString = $"Loading {length} Managed Types";
                 value = new PackedManagedType[length];
 
                 for (int n = 0, nend = value.Length; n < nend; ++n)
@@ -443,7 +471,7 @@ namespace HeapExplorer
 
         public override string ToString()
         {
-            var text = string.Format("name: {0}, isValueType: {1}, isArray: {2}, size: {3}", name, isValueType, isArray, size);
+            var text = $"name: {name}, isValueType: {isValueType}, isArray: {isArray}, size: {size}";
             return text;
         }
     }

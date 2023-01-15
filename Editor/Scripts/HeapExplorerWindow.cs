@@ -140,7 +140,8 @@ namespace HeapExplorer
         {
             if (!HeEditorUtility.IsVersionOrNewer(2019, 3))
             {
-                if (EditorUtility.DisplayDialog(HeGlobals.k_Title, string.Format("{0} requires Unity 2019.3 or newer.", HeGlobals.k_Title), "Forum", "Close"))
+                if (EditorUtility.DisplayDialog(HeGlobals.k_Title,
+                        $"{HeGlobals.k_Title} requires Unity 2019.3 or newer.", "Forum", "Close"))
                     Application.OpenURL(HeGlobals.k_ForumUrl);
                 return;
             }
@@ -506,7 +507,7 @@ namespace HeapExplorer
                         if (!System.IO.File.Exists(path))
                             continue;
 
-                        menu.AddItem(new GUIContent(string.Format("Recent/{0}     {1}", (n + 1), path.Replace('/', '\\'))), false, delegate (System.Object obj)
+                        menu.AddItem(new GUIContent($"Recent/{(n + 1)}     {path.Replace('/', '\\')}"), false, delegate (System.Object obj)
                         {
                             var p = obj as string;
                             LoadFromFile(p);
@@ -612,8 +613,8 @@ namespace HeapExplorer
                 if (GUILayout.Button(new GUIContent("Capture", HeEditorStyles.magnifyingGlassImage), EditorStyles.toolbarDropDown, GUILayout.Width(80)))
                 {
                     var menu = new GenericMenu();
-                    menu.AddItem(new GUIContent(string.Format("Capture and Save '{0}'...", connectedProfiler)), false, CaptureAndSaveHeap);
-                    menu.AddItem(new GUIContent(string.Format("Capture and Analyze '{0}'", connectedProfiler)), false, CaptureAndAnalyzeHeap);
+                    menu.AddItem(new GUIContent($"Capture and Save '{connectedProfiler}'..."), false, CaptureAndSaveHeap);
+                    menu.AddItem(new GUIContent($"Capture and Analyze '{connectedProfiler}'"), false, CaptureAndAnalyzeHeap);
                     menu.AddSeparator("");
                     menu.AddItem(new GUIContent(string.Format("Open Profiler")), false, delegate () { HeEditorUtility.OpenProfiler(); });
                     menu.DropDown(m_CaptureToolbarButtonRect);
@@ -832,7 +833,7 @@ namespace HeapExplorer
                 var heap = PackedMemorySnapshot.FromMemoryProfiler(args);
                 heap.SaveToFile(autoSavePath);
                 HeMruFiles.AddPath(autoSavePath);
-                ShowNotification(new GUIContent(string.Format("Memory snapshot saved as\n'{0}'", autoSavePath)));
+                ShowNotification(new GUIContent($"Memory snapshot saved as\n'{autoSavePath}'"));
             }
             catch
             {
@@ -892,7 +893,7 @@ namespace HeapExplorer
             }
             finally
             {
-                snapshotPath = string.Format("Captured Snapshot at {0}", DateTime.Now.ToShortTimeString());
+                snapshotPath = $"Captured Snapshot at {DateTime.Now.ToShortTimeString()}";
                 m_IsCapturing = false;
                 m_Repaint = true;
                 EditorUtility.ClearProgressBar();

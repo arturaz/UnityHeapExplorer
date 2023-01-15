@@ -106,8 +106,8 @@ namespace HeapExplorer
 
             System.IO.Directory.CreateDirectory(folder);
 
-            ExportNativeObjects(string.Format("{0}/{1}_native_objects.csv", folder, m_ExportName));
-            ExportManagedObjects(string.Format("{0}/{1}_managed_objects.csv", folder, m_ExportName));
+            ExportNativeObjects($"{folder}/{m_ExportName}_native_objects.csv");
+            ExportManagedObjects($"{folder}/{m_ExportName}_managed_objects.csv");
             //ExportManagedStaticFields(string.Format("{0}/{1}_managed_static_fields.csv", folder, m_ExportName));
         }
 
@@ -143,7 +143,7 @@ namespace HeapExplorer
                     obj.instanceId,
                     obj.isManager,
                     obj.hideFlags,
-                    obj.managedObject.type.name);
+                    obj.managedObject?.type.name);
             }
 
             System.IO.File.WriteAllText(filePath, sb.ToString(), System.Text.Encoding.UTF8);
@@ -172,8 +172,8 @@ namespace HeapExplorer
                     obj.address,
                     obj.size,
                     obj.type.assemblyName,
-                    obj.nativeObject.address,
-                    obj.nativeObject.type.name);
+                    obj.nativeObject?.address,
+                    obj.nativeObject?.type.name);
             }
 
             System.IO.File.WriteAllText(filePath, sb.ToString(), System.Text.Encoding.UTF8);
@@ -196,8 +196,8 @@ namespace HeapExplorer
                 sb.AppendFormat("\"{1}\"{0}\"{2}\"{0}\"{3}\"\n",
                     m_Delimiter,
                     obj.classType.name,
-                    obj.fieldType.name,
-                    obj.fieldType.assemblyName);
+                    obj.fieldType?.name,
+                    obj.fieldType?.assemblyName);
             }
 
             System.IO.File.WriteAllText(filePath, sb.ToString(), System.Text.Encoding.UTF8);

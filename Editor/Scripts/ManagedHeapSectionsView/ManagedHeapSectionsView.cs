@@ -83,7 +83,7 @@ namespace HeapExplorer
                             progressUpdate = Time.realtimeSinceStartup + 0.1f;
                             if (EditorUtility.DisplayCancelableProgressBar(
                                 "Saving...",
-                                string.Format("Memory Section {0} / {1}", n+1, sections.Length),
+                                $"Memory Section {n + 1} / {sections.Length}",
                                 (n + 1.0f) / sections.Length))
                                 break;
                         }
@@ -214,7 +214,8 @@ namespace HeapExplorer
                     // Managed heap fragmentation view
                     using (new EditorGUILayout.VerticalScope(HeEditorStyles.panel))
                     {
-                        var text = string.Format("{0} managed heap sections ({1}) within an {2} address space", GetMemorySections().Length, EditorUtility.FormatBytes((long)GetTotalHeapSize()), EditorUtility.FormatBytes((long)GetHeapAddressSpace()));
+                        var text =
+                            $"{GetMemorySections().Length} managed heap sections ({EditorUtility.FormatBytes((long) GetTotalHeapSize())}) within an {EditorUtility.FormatBytes((long) GetHeapAddressSpace())} address space";
                         GUILayout.Label(text, EditorStyles.boldLabel);
                         GUI.DrawTexture(GUILayoutUtility.GetRect(100, window.position.height * 0.1f, GUILayout.ExpandWidth(true)), m_HeapFragTexture, ScaleMode.StretchToFill);
                     }

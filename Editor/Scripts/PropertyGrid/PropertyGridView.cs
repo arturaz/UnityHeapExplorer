@@ -53,7 +53,7 @@ namespace HeapExplorer
                 using (new EditorGUILayout.HorizontalScope())
                 {
                     var label = "Field(s)";
-                    if (m_ManagedType.isValid)
+                    if (m_ManagedType.HasValue)
                         label = m_ManagedType.name + " field(s)";
                     EditorGUILayout.LabelField(label, EditorStyles.boldLabel, GUILayout.ExpandWidth(true));
 

@@ -2,10 +2,6 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEditor;
 using System;
 
 namespace HeapExplorer
@@ -14,8 +10,11 @@ namespace HeapExplorer
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
     public struct PackedNativeType : PackedMemorySnapshot.TypeForSubclassSearch
     {
-        // The index used to obtain the native C++ base class description from the PackedMemorySnapshot.nativeTypes array.
-        public System.Int32 nativeBaseTypeArrayIndex;
+        /// <summary>
+        /// The index used to obtain the native C++ base class description from the
+        /// <see cref="PackedMemorySnapshot.nativeTypes"/> array.
+        /// </summary>
+        public int nativeBaseTypeArrayIndex;
 
         [NonSerialized]
         public System.Int32 nativeTypeArrayIndex;
@@ -86,7 +85,7 @@ namespace HeapExplorer
             if (version >= 1)
             {
                 var length = reader.ReadInt32();
-                stateString = string.Format("Loading {0} Native Types", length);
+                stateString = $"Loading {length} Native Types";
 
                 value = new PackedNativeType[length];
 

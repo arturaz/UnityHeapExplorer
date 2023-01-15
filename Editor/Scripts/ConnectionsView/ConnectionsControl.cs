@@ -2,7 +2,6 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor.IMGUI.Controls;
@@ -14,11 +13,11 @@ namespace HeapExplorer
     {
         public HeapExplorerView fromView;
         public HeapExplorerView toView;
-        public RichGCHandle toGCHandle;
-        public RichManagedObject toManagedObject;
-        public RichNativeObject toNativeObject;
-        public RichStaticField toStaticField;
-        public RichManagedType toManagedType;
+        public RichGCHandle? toGCHandle;
+        public RichManagedObject? toManagedObject;
+        public RichNativeObject? toNativeObject;
+        public RichStaticField? toStaticField;
+        public RichManagedType? toManagedType;
 
         public GotoCommand()
         {
@@ -352,7 +351,7 @@ namespace HeapExplorer
                 m_GCHandle = new RichGCHandle(m_Snapshot, gcHandleArrayIndex);
 
                 displayName = "GCHandle";
-                m_Value = m_GCHandle.managedObject.isValid ? m_GCHandle.managedObject.type.name : "";
+                m_Value = m_GCHandle.managedObject.fold("", _ => _.type.name);
                 address = m_GCHandle.managedObjectAddress;
             }
 
@@ -365,21 +364,19 @@ namespace HeapExplorer
                         m_Owner.window.OnGoto(new GotoCommand(m_GCHandle));
                     }
 
-                    if (m_GCHandle.nativeObject.isValid)
-                    {
+                    {if (m_GCHandle.nativeObject.valueOut(out var nativeObject)) {
                         if (HeEditorGUI.CppButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_GCHandle.nativeObject));
+                            m_Owner.window.OnGoto(new GotoCommand(nativeObject));
                         }
-                    }
+                    }}
 
-                    if (m_GCHandle.managedObject.isValid)
-                    {
+                    {if (m_GCHandle.managedObject.valueOut(out var managedObject)) {
                         if (HeEditorGUI.CsButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_GCHandle.managedObject));
+                            m_Owner.window.OnGoto(new GotoCommand(managedObject));
                         }
-                    }
+                    }}
                 }
 
                 base.OnGUI(position, column);
@@ -392,14 +389,16 @@ namespace HeapExplorer
         {
             RichManagedObject m_ManagedObject;
 
-            public void Initialize(ConnectionsControl owner, PackedMemorySnapshot snapshot, int arrayIndex)
+            public void Initialize(
+                ConnectionsControl owner, PackedMemorySnapshot snapshot, PackedManagedObject.ArrayIndex arrayIndex
+            )
             {
                 m_Owner = owner;
                 m_ManagedObject = new RichManagedObject(snapshot, arrayIndex);
 
                 displayName = m_ManagedObject.type.name;
                 address = m_ManagedObject.address;
-                m_Value = m_ManagedObject.nativeObject.isValid ? m_ManagedObject.nativeObject.name : "";
+                m_Value = m_ManagedObject.nativeObject.fold("", _ => _.name);
                 m_Tooltip = PackedManagedTypeUtility.GetInheritanceAsString(snapshot, m_ManagedObject.type.packed.managedTypesArrayIndex);
             }
 
@@ -407,26 +406,24 @@ namespace HeapExplorer
             {
                 if (column == 0)
                 {
-                    if (m_ManagedObject.gcHandle.isValid)
-                    {
+                    {if (m_ManagedObject.gcHandle.valueOut(out var gcHandle)) {
                         if (HeEditorGUI.GCHandleButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_ManagedObject.gcHandle));
+                            m_Owner.window.OnGoto(new GotoCommand(gcHandle));
                         }
-                    }
+                    }}
 
                     if (HeEditorGUI.CsButton(HeEditorGUI.SpaceL(ref position, position.height)))
                     {
                         m_Owner.window.OnGoto(new GotoCommand(m_ManagedObject));
                     }
 
-                    if (m_ManagedObject.nativeObject.isValid)
-                    {
+                    {if (m_ManagedObject.nativeObject.valueOut(out var nativeObject)) {
                         if (HeEditorGUI.CppButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_ManagedObject.nativeObject));
+                            m_Owner.window.OnGoto(new GotoCommand(nativeObject));
                         }
-                    }
+                    }}
                 }
 
                 base.OnGUI(position, column);
@@ -504,21 +501,19 @@ namespace HeapExplorer
                         m_Owner.window.OnGoto(new GotoCommand(m_NativeObject));
                     }
 
-                    if (m_NativeObject.gcHandle.isValid)
-                    {
+                    {if (m_NativeObject.gcHandle.valueOut(out var gcHandle)) {
                         if (HeEditorGUI.GCHandleButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_NativeObject.gcHandle));
+                            m_Owner.window.OnGoto(new GotoCommand(gcHandle));
                         }
-                    }
+                    }}
 
-                    if (m_NativeObject.managedObject.isValid)
-                    {
+                    {if (m_NativeObject.managedObject.valueOut(out var managedObject)) {
                         if (HeEditorGUI.CsButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_NativeObject.managedObject));
+                            m_Owner.window.OnGoto(new GotoCommand(managedObject));
                         }
-                    }
+                    }}
                 }
 
                 base.OnGUI(position, column);
