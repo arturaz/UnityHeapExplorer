@@ -83,14 +83,20 @@ namespace HeapExplorer
                 m_DataVisualizer.Initialize(snapshot, new MemoryReader(snapshot), richManagedObject.address, richManagedObject.type.packed);
             }
 
-            m_HexView.Inspect(snapshot, managedObject.address, managedObject.size);
+            m_HexView.Inspect(snapshot, managedObject.address, managedObject.size.getOrElse(0));
         }
 
         public void Inspect(RichManagedType managedType)
         {
             m_ManagedType = Some(managedType);
             m_PropertyGrid.InspectStaticType(snapshot, managedType.packed);
-            m_HexView.Inspect(snapshot, 0, new ArraySegment64<byte>(managedType.packed.staticFieldBytes, 0, (ulong)managedType.packed.staticFieldBytes.LongLength));
+            m_HexView.Inspect(
+                snapshot, 0, 
+                new ArraySegment64<byte>(
+                    managedType.packed.staticFieldBytes, 0, 
+                    managedType.packed.staticFieldBytes.LongLength.ToULongClamped()
+                )
+            );
 
             m_DataVisualizer = null;
         }

@@ -425,12 +425,14 @@ namespace HeapExplorer
             desc.typeIndex.GetEntries(0, desc.typeIndex.GetNumEntries(), ref fieldTypeIndex);
 
             var sourceFieldDescriptions = new PackedManagedField[desc.GetNumEntries()];
-            for (int n=0, nend = sourceFieldDescriptions.Length; n < nend; ++n)
-            {
-                sourceFieldDescriptions[n].name = fieldName[n];
-                sourceFieldDescriptions[n].isStatic = fieldStatic[n];
-                sourceFieldDescriptions[n].offset = fieldOffset[n];
-                sourceFieldDescriptions[n].managedTypesArrayIndex = fieldTypeIndex[n];
+            for (int n=0, nend = sourceFieldDescriptions.Length; n < nend; ++n) {
+                var name = fieldName[n];
+                var isStatic = fieldStatic[n];
+                var offset = PInt.createOrThrow(fieldOffset[n]);
+                var managedTypesArrayIndex = PInt.createOrThrow(fieldTypeIndex[n]);
+                sourceFieldDescriptions[n] = new PackedManagedField(
+                    name: name, isStatic: isStatic, offset: offset, managedTypesArrayIndex: managedTypesArrayIndex
+                );
             }
 
             for (int n = 0, nend = value.Length; n < nend; ++n) {
@@ -453,10 +455,12 @@ namespace HeapExplorer
                 for (var j=0; j< sourceFieldIndices[n].Length; ++j)
                 {
                     var i = sourceFieldIndices[n][j];
-                    value[n].fields[j].name = sourceFieldDescriptions[i].name;
-                    value[n].fields[j].offset = sourceFieldDescriptions[i].offset;
-                    value[n].fields[j].isStatic = sourceFieldDescriptions[i].isStatic;
-                    value[n].fields[j].managedTypesArrayIndex = sourceFieldDescriptions[i].managedTypesArrayIndex;
+                    value[n].fields[j] = new PackedManagedField(
+                        name: sourceFieldDescriptions[i].name,
+                        offset: sourceFieldDescriptions[i].offset,
+                        isStatic: sourceFieldDescriptions[i].isStatic,
+                        managedTypesArrayIndex: sourceFieldDescriptions[i].managedTypesArrayIndex
+                    );
                 }
 
                 // namespace-less types have a preceding dot, which we remove here

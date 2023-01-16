@@ -100,8 +100,9 @@ namespace HeapExplorer
                 var obj = snapshot.managedObjects[n];
                 var type = snapshot.managedTypes[obj.managedTypesArrayIndex];
 
-                m_ManagedMemoryTotal += obj.size;
-                m_ManagedMemory[type.managedTypesArrayIndex].size += obj.size;
+                var objSize = obj.size.getOrElse(0);
+                m_ManagedMemoryTotal += objSize;
+                m_ManagedMemory[type.managedTypesArrayIndex].size += objSize;
                 m_ManagedMemory[type.managedTypesArrayIndex].typeIndex = obj.managedTypesArrayIndex;
             }
             System.Array.Sort(m_ManagedMemory, delegate (Entry x, Entry y)
@@ -268,7 +269,10 @@ namespace HeapExplorer
                     using (new EditorGUILayout.HorizontalScope())
                     {
                         GUILayout.Label("Total", GUILayout.Width(k_ColumnPercentageWidth));
-                        GUILayout.Label(EditorUtility.FormatBytes(snapshot.virtualMachineInformation.pointerSize * snapshot.gcHandles.Length), EditorStyles.boldLabel, GUILayout.Width(k_ColumnSizeWidth));
+                        GUILayout.Label(EditorUtility.FormatBytes(
+                            snapshot.virtualMachineInformation.pointerSize.sizeInBytes() * snapshot.gcHandles.Length), 
+                            EditorStyles.boldLabel, GUILayout.Width(k_ColumnSizeWidth)
+                        );
                         if (GUILayout.Button("Investigate"))
                             window.OnGoto(new GotoCommand(new RichGCHandle(snapshot, 0)));
                     }
@@ -280,7 +284,7 @@ namespace HeapExplorer
                     GUILayout.Label("Virtual Machine Information", EditorStyles.boldLabel);
                     GUILayout.Space(8);
 
-                    DrawStats("", EditorUtility.FormatBytes(snapshot.virtualMachineInformation.pointerSize), "Pointer Size");
+                    DrawStats("", EditorUtility.FormatBytes(snapshot.virtualMachineInformation.pointerSize.sizeInBytes()), "Pointer Size");
                     DrawStats("", EditorUtility.FormatBytes(snapshot.virtualMachineInformation.objectHeaderSize), "Object Header Size");
                     DrawStats("", EditorUtility.FormatBytes(snapshot.virtualMachineInformation.arrayHeaderSize), "Array Header Size");
                     DrawStats("", EditorUtility.FormatBytes(snapshot.virtualMachineInformation.arrayBoundsOffsetInHeader), "Array Bounds Offset In Header");

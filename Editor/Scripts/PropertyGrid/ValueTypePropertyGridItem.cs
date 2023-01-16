@@ -55,10 +55,11 @@ namespace HeapExplorer
 
         protected override void OnBuildChildren(System.Action<BuildChildrenArgs> add)
         {
-            var args = new BuildChildrenArgs();
-            args.parent = this;
-            args.type = m_Snapshot.managedTypes[field.managedTypesArrayIndex];
-            args.address = address - (ulong)m_Snapshot.virtualMachineInformation.objectHeaderSize;
+            var args = new BuildChildrenArgs {
+                parent = this,
+                type = m_Snapshot.managedTypes[field.managedTypesArrayIndex],
+                address = address - m_Snapshot.virtualMachineInformation.objectHeaderSize
+            };
             args.memoryReader = field.isStatic ? (AbstractMemoryReader)(new StaticMemoryReader(m_Snapshot, args.type.staticFieldBytes)) : (AbstractMemoryReader)(new MemoryReader(m_Snapshot));// m_memoryReader;
             add(args);
         }

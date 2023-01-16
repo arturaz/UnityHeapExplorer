@@ -511,7 +511,7 @@ namespace HeapExplorer
             {
                 get
                 {
-                    return (ulong)m_Object.packed.nativeObjectAddress;
+                    return m_Object.packed.nativeObjectAddress;
                 }
             }
 

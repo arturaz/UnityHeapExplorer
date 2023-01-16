@@ -28,15 +28,16 @@ namespace HeapExplorer
             if (address == 0) return Utils.zeroAddressAccessError<int>(nameof(address));
 
             // check if address still in the memory section we have already
-            if (address >= m_StartAddress && address < m_EndAddress)
-            {
+            if (address >= m_StartAddress && address < m_EndAddress) {
                 return Some((int)(address - m_StartAddress));
             }
 
             // it is a new section, try to find it
-            if (!m_Snapshot.FindHeapOfAddress(address).valueOut(out var heapIndex))
-            {
-                Debug.LogWarningFormat("HeapExplorer: Heap at {0:X} not found. Haven't figured out why this happens yet. Perhaps related to .NET4 ScriptingRuntime?", address);
+            if (!m_Snapshot.FindHeapOfAddress(address).valueOut(out var heapIndex)) {
+                Debug.LogWarning(
+                    $"HeapExplorer: Heap at address='{address:X}' not found. Haven't figured out why this happens yet. "
+                    + "Perhaps related to .NET4 ScriptingRuntime?"
+                );
                 return None._;
             }
 
@@ -227,7 +228,7 @@ namespace HeapExplorer
             TryBeginRead(address).map(m_Bytes, (offset, bytes) => System.BitConverter.ToUInt64(bytes, offset));
 
         public Option<ulong> ReadPointer(ulong address) => 
-            m_Snapshot.virtualMachineInformation.pointerSize == 8 
+            m_Snapshot.virtualMachineInformation.pointerSize == PointerSize._64Bit 
                 ? ReadUInt64(address) 
                 : ReadUInt32(address).map(value => (ulong) value);
 
@@ -349,7 +350,7 @@ namespace HeapExplorer
             // Unity bug? For a reason that I do not understand, sometimes a memory segment is smaller
             // than the actual size of an object. In order to workaround this issue, we make sure to never
             // try to read more data from the segment than is available.
-            if ((m_Bytes.Length - offset) < size)
+            if (m_Bytes.Length - offset < size)
             {
                 //var wantedLength = size;
                 size = m_Bytes.Length - offset;
@@ -389,9 +390,9 @@ namespace HeapExplorer
 
                 if (!ReadArrayLength(address, typeDescription).valueOut(out var arrayLength)) return None._;
                 var elementType = m_Snapshot.managedTypes[typeDescription.baseOrElementTypeIndex.getOrThrow()];
-                var elementSize = elementType.isValueType ? elementType.size : m_Snapshot.virtualMachineInformation.pointerSize;
+                var elementSize = elementType.isValueType ? elementType.size : m_Snapshot.virtualMachineInformation.pointerSize.sizeInBytes();
 
-                var size = m_Snapshot.virtualMachineInformation.arrayHeaderSize;
+                var size = m_Snapshot.virtualMachineInformation.arrayHeaderSize.asInt;
                 size += elementSize * arrayLength;
                 return Some(size);
             }
@@ -399,10 +400,9 @@ namespace HeapExplorer
             // System.String
             if (typeDescription.managedTypesArrayIndex == m_Snapshot.coreTypes.systemString)
             {
-                var size = m_Snapshot.virtualMachineInformation.objectHeaderSize;
+                var size = m_Snapshot.virtualMachineInformation.objectHeaderSize.asInt;
                 size += sizeof(int); // string length
-                var maybeStringLength =
-                    ReadStringLength(address + (uint) m_Snapshot.virtualMachineInformation.objectHeaderSize);
+                var maybeStringLength = ReadStringLength(address + m_Snapshot.virtualMachineInformation.objectHeaderSize);
                 if (!maybeStringLength.valueOut(out var stringLength)) return None._;
                 size += stringLength * sizeof(char);
                 size += 2; // two null terminators aka \0\0
@@ -416,14 +416,14 @@ namespace HeapExplorer
         {
             var vm = m_Snapshot.virtualMachineInformation;
 
-            if (!ReadPointer(address + (ulong) vm.arrayBoundsOffsetInHeader).valueOut(out var bounds)) return None._;
+            if (!ReadPointer(address + vm.arrayBoundsOffsetInHeader).valueOut(out var bounds)) return None._;
             if (bounds == 0)
-                return ReadPointer(address + (ulong)vm.arraySizeOffsetInHeader).map(v => (int)v);
+                return ReadPointer(address + vm.arraySizeOffsetInHeader).map(v => (int)v);
 
             int length = 1;
             for (int i = 0; i != arrayType.arrayRank; i++)
             {
-                var ptr = bounds + (ulong)(i * vm.pointerSize);
+                var ptr = bounds + (ulong)(i * vm.pointerSize.sizeInBytes());
                 if (!ReadPointer(ptr).valueOut(out var value)) return None._;
                 length *= (int)value;
             }
@@ -442,11 +442,11 @@ namespace HeapExplorer
 
             var vm = m_Snapshot.virtualMachineInformation;
 
-            if (!ReadPointer(address + (ulong) vm.arrayBoundsOffsetInHeader).valueOut(out var bounds)) return None._;
+            if (!ReadPointer(address + vm.arrayBoundsOffsetInHeader).valueOut(out var bounds)) return None._;
             if (bounds == 0)
-                return ReadPointer(address + (ulong)vm.arraySizeOffsetInHeader).map(v => (int)v);
+                return ReadPointer(address + vm.arraySizeOffsetInHeader).map(v => (int)v);
 
-            var pointer = bounds + (ulong)(dimension * vm.pointerSize);
+            var pointer = bounds + (ulong)(dimension * vm.pointerSize.sizeInBytes());
             return ReadPointer(pointer).map(v => (int)v);
         }
 
@@ -533,7 +533,7 @@ namespace HeapExplorer
                     heapReader = new MemoryReader(m_Snapshot);
 
                 // https://stackoverflow.com/questions/3815227/understanding-clr-object-size-between-32-bit-vs-64-bit
-                return heapReader.ReadString(pointer + (ulong) m_Snapshot.virtualMachineInformation.objectHeaderSize)
+                return heapReader.ReadString(pointer + m_Snapshot.virtualMachineInformation.objectHeaderSize)
                     .map(v => '\"' + v + '\"');
             }
 
@@ -582,7 +582,12 @@ namespace HeapExplorer
                         if (n > 0)
                             offset += instanceFields[n].offset - m_Snapshot.virtualMachineInformation.objectHeaderSize; // TODO: this is trial&error. make sure to understand it!
 
-                        m_StringBuilder.Append(ReadFieldValueAsString(address + (ulong)offset, m_Snapshot.managedTypes[instanceFields[n].managedTypesArrayIndex]));
+                        m_StringBuilder.Append(
+                            ReadFieldValueAsString(
+                                address + (ulong)offset, 
+                                m_Snapshot.managedTypes[instanceFields[n].managedTypesArrayIndex]
+                            ).getOrElse("<read error>")
+                        );
                         if (n < count - 1)
                             m_StringBuilder.Append(", ");
                     }

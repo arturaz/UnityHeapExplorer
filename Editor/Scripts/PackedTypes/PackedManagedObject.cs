@@ -12,12 +12,12 @@ namespace HeapExplorer
         /// <summary>
         /// The address of the managed object
         /// </summary>
-        public ulong address;
+        public readonly ulong address;
 
         /// <summary>
-        /// If this object is a static field
+        /// `Some` if this object is a static field.
         /// </summary>
-        public byte[] staticBytes;
+        public Option<byte[]> staticBytes;
 
         /// <summary>
         /// An index into the <see cref="PackedMemorySnapshot.managedTypes"/> array that stores this managed type
@@ -41,11 +41,26 @@ namespace HeapExplorer
         /// </summary>
         public Option<int> nativeObjectsArrayIndex;
 
-        // Size in bytes of this object.
-        // ValueType arrays = count * sizeof(element)
-        // ReferenceType arrays = count * sizeof(pointer)
-        // String = length * sizeof(wchar) + strlen("\0\0")
-        public uint size;
+        /// <summary>
+        /// Size in bytes of this object. `None` if the size is unknown.<br/>
+        /// ValueType arrays = count * sizeof(element)<br/>
+        /// ReferenceType arrays = count * sizeof(pointer)<br/>
+        /// String = length * sizeof(wchar) + strlen("\0\0")
+        /// </summary>
+        public Option<uint> size;
+
+        public PackedManagedObject(
+            ulong address, Option<byte[]> staticBytes, int managedTypesArrayIndex, ArrayIndex managedObjectsArrayIndex, 
+            Option<int> gcHandlesArrayIndex, Option<int> nativeObjectsArrayIndex, Option<uint> size
+        ) {
+            this.address = address;
+            this.staticBytes = staticBytes;
+            this.managedTypesArrayIndex = managedTypesArrayIndex;
+            this.managedObjectsArrayIndex = managedObjectsArrayIndex;
+            this.gcHandlesArrayIndex = gcHandlesArrayIndex;
+            this.nativeObjectsArrayIndex = nativeObjectsArrayIndex;
+            this.size = size;
+        }
 
         public static PackedManagedObject New(
             ulong address,
@@ -53,16 +68,16 @@ namespace HeapExplorer
             int managedTypesArrayIndex,
             Option<int> gcHandlesArrayIndex = default,
             Option<int> nativeObjectsArrayIndex = default
-        )
-        {
-            return new PackedManagedObject()
-            {
-                managedTypesArrayIndex = managedTypesArrayIndex,
-                managedObjectsArrayIndex = managedObjectsArrayIndex,
-                gcHandlesArrayIndex = gcHandlesArrayIndex,
-                nativeObjectsArrayIndex = nativeObjectsArrayIndex,
-            };
-        }
+        ) =>
+            new PackedManagedObject(
+                address: address,
+                managedTypesArrayIndex: managedTypesArrayIndex,
+                managedObjectsArrayIndex: managedObjectsArrayIndex,
+                gcHandlesArrayIndex: gcHandlesArrayIndex,
+                nativeObjectsArrayIndex: nativeObjectsArrayIndex,
+                size: None._, 
+                staticBytes: None._
+            );
 
         /// <summary>
         /// Named tuple of <see cref="isStatic"/> and <see cref="index"/>.

@@ -77,8 +77,8 @@ namespace HeapExplorer
                     continue;
 
                 // Read the delegate m_target pointer
-                var m_targetPtr = obj.address + (uint) field.offset;
-                if (!reader.ReadPointer(obj.address + (uint) field.offset).valueOut(out var pointer)) {
+                var m_targetPtr = obj.address + field.offset;
+                if (!reader.ReadPointer(obj.address + field.offset).valueOut(out var pointer)) {
                     Debug.LogError($"Can't read 'm_target' pointer from address {m_targetPtr:X}");
                     continue;
                 }

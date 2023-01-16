@@ -52,7 +52,7 @@ namespace HeapExplorer
 
                 // Try to get the m_InstanceID field (only exists in editor, not in built players)
                 if (richType.FindField("m_InstanceID", out var packedField)) {
-                    var instanceIDPtr = obj.address + (ulong) packedField.offset;
+                    var instanceIDPtr = obj.address + packedField.offset;
                     if (!memoryReader.ReadInt32(instanceIDPtr).valueOut(out var instanceID)) {
                         m_Snapshot.Error($"Can't read 'instanceID' from address {instanceIDPtr:X}, skipping."); 
                         continue;

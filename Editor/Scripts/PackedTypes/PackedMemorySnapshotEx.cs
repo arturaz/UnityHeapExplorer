@@ -126,43 +126,34 @@ namespace HeapExplorer
         /// </summary>
         /// <param name="address">The managed object memory address.</param>
         /// <returns>An index into the snapshot.managedTypes array on success, `None` otherwise.</returns>
-        public Option<int> FindManagedObjectTypeOfAddress(ulong address)
-        {
+        public Option<int> FindManagedObjectTypeOfAddress(ulong address) {
             // IL2CPP has the class pointer as the first member of the object.
-            var typeIndex = FindManagedTypeOfTypeInfoAddress(address);
-            if (typeIndex.isSome) return typeIndex;
+            {if (FindManagedTypeOfTypeInfoAddress(address).valueOut(out var il2cppAddress))
+                return Some(il2cppAddress);}
 
             // Mono has a vtable pointer as the first member of the object.
             // The first member of the vtable is the class pointer.
-            var maybeHeapIndex = FindHeapOfAddress(address);
-            if (!maybeHeapIndex.valueOut(out var heapIndex)) return None._;
+            if (!FindHeapOfAddress(address).valueOut(out var heapIndex)) return None._;
 
             var vtable = managedHeapSections[heapIndex];
-            var offset = (int)(address - vtable.startAddress);
-            var vtableClassPointer = 
-                virtualMachineInformation.pointerSize == 8 
-                    ? BitConverter.ToUInt64(vtable.bytes, offset) 
-                    : BitConverter.ToUInt32(vtable.bytes, offset);
+            var vtableClassPointerOffset = (int) (address - vtable.startAddress);
+            var vtableClassPointer =
+                virtualMachineInformation.pointerSize.readPointer(vtable.bytes, vtableClassPointerOffset);
             if (vtableClassPointer == 0) return None._;
 
             // Mono has a vtable pointer as the first member of the object.
             // The first member of the vtable is the class pointer.
-            maybeHeapIndex = FindHeapOfAddress(vtableClassPointer);
-            if (maybeHeapIndex.isNone)
-            {
-                maybeHeapIndex = FindManagedTypeOfTypeInfoAddress(vtableClassPointer);
+            if (!FindHeapOfAddress(vtableClassPointer).valueOut(out heapIndex)) {
+                var maybeHeapIndex = FindManagedTypeOfTypeInfoAddress(vtableClassPointer);
                 //Error("Cannot find memory segment for vtableClassPointer pointing at address '{0:X}'.", vtableClassPointer);
                 return maybeHeapIndex;
             }
 
-            offset = (int)(vtableClassPointer - managedHeapSections[heapIndex].startAddress);
-
-            if (virtualMachineInformation.pointerSize == 8)
-                typeIndex = FindManagedTypeOfTypeInfoAddress(BitConverter.ToUInt64(managedHeapSections[heapIndex].bytes, offset));
-            else if (virtualMachineInformation.pointerSize == 4)
-                typeIndex = FindManagedTypeOfTypeInfoAddress(BitConverter.ToUInt32(managedHeapSections[heapIndex].bytes, offset));
-
-            return typeIndex;
+            var typeInfoAddressOffset = (int) (vtableClassPointer - managedHeapSections[heapIndex].startAddress);
+            var typeInfoAddressBytes = managedHeapSections[heapIndex].bytes;
+            var typeInfoAddress = 
+                virtualMachineInformation.pointerSize.readPointer(typeInfoAddressBytes, typeInfoAddressOffset);
+            return FindManagedTypeOfTypeInfoAddress(typeInfoAddress);
         }
 
         /// <summary>
@@ -262,10 +253,7 @@ namespace HeapExplorer
         /// <returns>An index into the <see cref="managedTypes"/> array on success, `None` otherwise.</returns>
         public Option<int> FindManagedTypeOfTypeInfoAddress(UInt64 typeInfoAddress)
         {
-            if (typeInfoAddress == 0) {
-                Error("HeapExplorer: FindManagedTypeOfTypeInfoAddress() received `typeInfoAddress` which was 0.");
-                return new Option<int>();
-            }
+            if (typeInfoAddress == 0) return Utils.zeroAddressAccessError<int>(nameof(typeInfoAddress));
 
             // Initialize the Look Up Table if it's not initialized.
             if (m_FindManagedTypeOfTypeInfoAddressLUT == null)
@@ -283,39 +271,44 @@ namespace HeapExplorer
         /// </summary>
         /// <param name="address">The memory address.</param>
         /// <returns>An index into the <see cref="managedHeapSections"/> array on success, `None` otherwise.</returns>
-        public Option<int> FindHeapOfAddress(UInt64 address)
-        {
-            var first = 0;
-            var last = managedHeapSections.Length - 1;
+        public Option<int> FindHeapOfAddress(UInt64 address) {
+            return binarySearch() 
+                   // Debug code - try linear search to see if algorithm is broken.
+                   || linearSearch();
 
-            while (first <= last)
-            {
-                var mid = (first + last) >> 1;
-                var section = managedHeapSections[mid];
+            Option<int> binarySearch() {
+                var first = 0;
+                var last = managedHeapSections.Length - 1;
 
-                if (section.containsAddress(address))
-                    return Some(mid);
-                else if (address < section.startAddress)
-                    last = mid - 1;
-                else if (address > section.startAddress)
-                    first = mid + 1;
+                while (first <= last) {
+                    var mid = (first + last) >> 1;
+                    var section = managedHeapSections[mid];
+
+                    if (section.containsAddress(address))
+                        return Some(mid);
+                    else if (address < section.startAddress)
+                        last = mid - 1;
+                    else if (address > section.startAddress)
+                        first = mid + 1;
+                }
+
+                return None._;
             }
 
-            // Debug code - try linear search to see if algorithm is broken.
-            {
+            Option<int> linearSearch() {
                 var sectionCount = managedHeapSections.Length;
                 for (var index = 0; index < sectionCount; index++) {
                     if (managedHeapSections[index].containsAddress(address)) {
-                        Warning(
-                            "HeapExplorer: FindHeapOfAddress({0}) - binary search has failed, but linear search "
-                            + "succeeded, this indicated a bug in the algorithm.", address
+                        Debug.LogWarning(
+                            $"HeapExplorer: FindHeapOfAddress(0x{address:X}) - binary search has failed, but linear search "
+                            + "succeeded, this indicated a bug in the algorithm."
                         );
                         return Some(index);
                     }
                 }
-            }
 
-            return new Option<int>();
+                return None._;
+            }
         }
 
         /// <summary>
@@ -687,10 +680,7 @@ namespace HeapExplorer
             busyString = "Initializing Managed Heap Sections";
 
             // sort sections by address. This allows us to use binary search algorithms.
-            Array.Sort(managedHeapSections, delegate (PackedMemorySection x, PackedMemorySection y)
-            {
-                return x.startAddress.CompareTo(y.startAddress);
-            });
+            Array.Sort(managedHeapSections, (x, y) => x.startAddress.CompareTo(y.startAddress));
 
             for (var n = 0; n < managedHeapSections.Length; ++n)
                 managedHeapSections[n].arrayIndex = n;
@@ -1037,7 +1027,7 @@ namespace HeapExplorer
                     continue;
 
                 managedTypes[typeArrayIndex].totalObjectCount += 1;
-                managedTypes[typeArrayIndex].totalObjectSize += managedObjects[n].size;
+                managedTypes[typeArrayIndex].totalObjectSize += managedObjects[n].size.getOrElse(0);
             }
         }
 

@@ -2,15 +2,13 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
-using System.Collections;
-using System.Collections.Generic;
-using UnityEngine;
-using UnityEditor;
 using System;
 
 namespace HeapExplorer
 {
-    // Description of a field of a managed type.
+    /// <summary>
+    /// Description of a field of a managed type.
+    /// </summary>
     [Serializable]
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
     public struct PackedManagedField
@@ -18,24 +16,32 @@ namespace HeapExplorer
         /// <summary>
         /// Offset of this field.
         /// </summary>
-        public System.Int32 offset;
+        public readonly PInt offset;
 
         /// <summary>
         /// The type index into <see cref="PackedMemorySnapshot.managedTypes"/> of the type this field belongs to.
         /// </summary>
-        public System.Int32 managedTypesArrayIndex;
+        public readonly PInt managedTypesArrayIndex;
 
         /// <summary>
         /// Name of this field.
         /// </summary>
-        public System.String name;
+        public string name;
 
         /// <summary>
         /// Is this field static?
         /// </summary>
-        public System.Boolean isStatic;
+        public readonly bool isStatic;
 
         [NonSerialized] public bool isBackingField;
+
+        public PackedManagedField(PInt offset, PInt managedTypesArrayIndex, string name, bool isStatic) {
+            this.offset = offset;
+            this.managedTypesArrayIndex = managedTypesArrayIndex;
+            this.name = name;
+            this.isStatic = isStatic;
+            isBackingField = false;
+        }
 
         const System.Int32 k_Version = 1;
 
@@ -47,8 +53,8 @@ namespace HeapExplorer
             for (int n = 0, nend = value.Length; n < nend; ++n)
             {
                 writer.Write(value[n].name);
-                writer.Write(value[n].offset);
-                writer.Write(value[n].managedTypesArrayIndex);
+                writer.Write(value[n].offset.asInt);
+                writer.Write(value[n].managedTypesArrayIndex.asInt);
                 writer.Write(value[n].isStatic);
             }
         }
@@ -65,10 +71,16 @@ namespace HeapExplorer
 
                 for (int n = 0, nend = value.Length; n < nend; ++n)
                 {
-                    value[n].name = reader.ReadString();
-                    value[n].offset = reader.ReadInt32();
-                    value[n].managedTypesArrayIndex = reader.ReadInt32();
-                    value[n].isStatic = reader.ReadBoolean();
+                    var name = reader.ReadString();
+                    var offset = PInt.createOrThrow(reader.ReadInt32());
+                    var managedTypesArrayIndex = PInt.createOrThrow(reader.ReadInt32());
+                    var isStatic = reader.ReadBoolean();
+                    value[n] = new PackedManagedField(
+                        name: name,
+                        offset: offset,
+                        managedTypesArrayIndex: managedTypesArrayIndex,
+                        isStatic: isStatic
+                    );
                 }
             }
         }

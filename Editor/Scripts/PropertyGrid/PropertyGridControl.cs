@@ -67,7 +67,7 @@ namespace HeapExplorer
             var m_type = snapshot.managedTypes[managedObject.managedTypesArrayIndex];
             var m_address = managedObject.address;
             if (m_type.isValueType)
-                m_address -= (ulong)m_Snapshot.virtualMachineInformation.objectHeaderSize;
+                m_address -= m_Snapshot.virtualMachineInformation.objectHeaderSize;
 
             var root = new TreeViewItem { id = 0, depth = -1, displayName = "Root" };
             if (m_Snapshot == null)
@@ -279,7 +279,7 @@ namespace HeapExplorer
                     if (fieldType.baseOrElementTypeIndex.isNone)
                         continue;
 
-                    var pointer = reader.ReadPointer(address + (ulong)type.fields[n].offset).getOrThrow();
+                    var pointer = reader.ReadPointer(address + type.fields[n].offset).getOrThrow();
                     var item = new ArrayPropertyGridItem(this, m_Snapshot, pointer, new MemoryReader(m_Snapshot))
                     {
                         depth = target.depth + 1,
@@ -295,7 +295,7 @@ namespace HeapExplorer
                 // Primitive types and types derived from System.Enum
                 if (fieldType.isValueType && (fieldType.isPrimitive || m_Snapshot.IsEnum(fieldType)))
                 {
-                    var item = new PrimitiveTypePropertyGridItem(this, m_Snapshot, address + (ulong)type.fields[n].offset, reader)
+                    var item = new PrimitiveTypePropertyGridItem(this, m_Snapshot, address + type.fields[n].offset, reader)
                     {
                         depth = target.depth + 1,
                         field = type.fields[n]
@@ -309,7 +309,7 @@ namespace HeapExplorer
                 // Value types
                 if (fieldType.isValueType)
                 {
-                    var item = new ValueTypePropertyGridItem(this, m_Snapshot, address + (ulong)type.fields[n].offset, reader)
+                    var item = new ValueTypePropertyGridItem(this, m_Snapshot, address + type.fields[n].offset, reader)
                     {
                         depth = target.depth + 1,
                         field = type.fields[n]
@@ -323,7 +323,7 @@ namespace HeapExplorer
                 // Reference types
                 //if (fieldType.isPointer)
                 {
-                    var item = new ReferenceTypePropertyGridItem(this, m_Snapshot, address + (ulong)type.fields[n].offset, reader)
+                    var item = new ReferenceTypePropertyGridItem(this, m_Snapshot, address + type.fields[n].offset, reader)
                     {
                         depth = target.depth + 1,
                         field = type.fields[n]

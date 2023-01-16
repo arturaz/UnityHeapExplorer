@@ -196,7 +196,7 @@ namespace HeapExplorer
                 address = m_Snapshot.managedHeapSections[arrayIndex].startAddress;
                 if (m_Snapshot.managedHeapSections[arrayIndex].bytes != null)
                 {
-                    size = (ulong)m_Snapshot.managedHeapSections[arrayIndex].bytes.LongLength;
+                    size = m_Snapshot.managedHeapSections[arrayIndex].bytes.LongLength.ToULongClamped();
 
 #if HEAPEXPLORER_DISPLAY_REFS
                     m_Snapshot.GetConnectionsCount(m_Snapshot.managedHeapSections[arrayIndex], out refs);

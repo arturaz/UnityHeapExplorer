@@ -38,6 +38,6 @@ namespace HeapExplorer
 
         public ulong managedObjectAddress => packed.target;
 
-        public int size => snapshot.virtualMachineInformation.pointerSize;
+        public int size => snapshot.virtualMachineInformation.pointerSize.sizeInBytes();
     }
 }

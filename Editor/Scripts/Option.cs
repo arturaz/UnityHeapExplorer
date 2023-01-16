@@ -44,9 +44,9 @@ public readonly struct Option<A> : IEquatable<Option<A>> {
     isSome ? __unsafeGet : ifNoValue;
 
   /// <summary>Returns <see cref="__unsafeGet"/> if this is `Some`, throws an exception otherwise.</summary>
-  public A getOrThrow() {
+  public A getOrThrow(string message = null) {
     if (isSome) return __unsafeGet;
-    else throw new Exception($"Expected Option of type '{typeof(A).FullName}' to be `Some` but it was `None`");
+    else throw new Exception(message ?? $"Expected Option of type '{typeof(A).FullName}' to be `Some` but it was `None`");
   }
   
   /// <summary>
@@ -101,6 +101,26 @@ public readonly struct Option<A> : IEquatable<Option<A>> {
 
   /// <inheritdoc cref="None._"/>
   public static implicit operator Option<A>(None _) => new Option<A>();
+  
+  public static bool operator true(Option<A> opt) => opt.isSome;
+    
+  /// <summary>
+  /// Required by |.
+  /// <para/>
+  /// http://stackoverflow.com/questions/686424/what-are-true-and-false-operators-in-c#comment43525525_686473
+  /// <para/>
+  /// <![CDATA[
+  /// The only situation where operator false matters, seems to be if MyClass also overloads
+  /// the operator &, in a suitable way. So you can say MyClass conj = GetMyClass1() & GetMyClass2();.
+  /// Then with operator false you can short-circuit and say
+  /// `MyClass conj = GetMyClass1() && GetMyClass2();`, using && instead of &. That will only
+  /// evaluate the second operand if the first one is not "false".
+  /// ]]>
+  /// </summary>
+  public static bool operator false(Option<A> opt) => opt.isNone;
+    
+  /// <summary>Allows doing <code>var otherOption = option1 || option2</code></summary>
+  public static Option<A> operator |(Option<A> o1, Option<A> o2) => o1 ? o1 : o2;
   
 #region Equality
 

@@ -70,7 +70,7 @@ namespace HeapExplorer
 
         public void Select(PackedManagedObject obj)
         {
-            var item = FindItemByAddressRecursive(rootItem, (ulong)(obj.address));
+            var item = FindItemByAddressRecursive(rootItem, obj.address);
             SelectItem(item);
         }
 

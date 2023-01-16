@@ -28,7 +28,7 @@ namespace HeapExplorer
 
         public ulong address => packed.address;
 
-        public uint size => packed.size;
+        public uint size => packed.size.getOrElse(0);
 
         public RichManagedType type => new RichManagedType(snapshot, packed.managedTypesArrayIndex);
 

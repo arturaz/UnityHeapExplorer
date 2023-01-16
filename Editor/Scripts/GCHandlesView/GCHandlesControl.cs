@@ -45,7 +45,7 @@ namespace HeapExplorer
 
         public void Select(PackedGCHandle obj)
         {
-            var item = FindItemByAddressRecursive(rootItem, (ulong)(obj.target));
+            var item = FindItemByAddressRecursive(rootItem, obj.target);
             if (item != null)
                 SetSelection(new[] { item.id }, TreeViewSelectionOptions.RevealAndFrame | TreeViewSelectionOptions.FireSelectionChanged);
         }

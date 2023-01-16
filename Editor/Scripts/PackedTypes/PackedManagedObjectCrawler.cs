@@ -177,8 +177,8 @@ namespace HeapExplorer
                     }
 
                     AbstractMemoryReader memoryReader = m_MemoryReader;
-                    if (mo.staticBytes != null)
-                        memoryReader = new StaticMemoryReader(m_Snapshot, mo.staticBytes);
+                    {if (mo.staticBytes.valueOut(out var staticBytes))
+                        memoryReader = new StaticMemoryReader(m_Snapshot, staticBytes);}
 
                     if (baseType.isArray)
                     {
@@ -223,8 +223,8 @@ namespace HeapExplorer
 
                             if (elementType.isArray) {
                                 var ptr = mo.address
-                                          + (ulong) (k * virtualMachineInformation.pointerSize)
-                                          + (ulong) virtualMachineInformation.arrayHeaderSize;
+                                          + (ulong) (k * virtualMachineInformation.pointerSize.sizeInBytes())
+                                          + virtualMachineInformation.arrayHeaderSize;
                                 if (!memoryReader.ReadPointer(ptr).valueOut(out elementAddr)) {
                                     m_Snapshot.Error($"Can't read ptr={ptr:X} for k={k}, type='{elementType.name}'");
                                     break;
@@ -235,13 +235,13 @@ namespace HeapExplorer
                                 elementAddr = 
                                     mo.address 
                                     + (ulong)(k * elementType.size) 
-                                    + (ulong)virtualMachineInformation.arrayHeaderSize 
-                                    - (ulong)virtualMachineInformation.objectHeaderSize;
+                                    + virtualMachineInformation.arrayHeaderSize 
+                                    - virtualMachineInformation.objectHeaderSize;
                             }
                             else {
                                 var ptr = mo.address
-                                          + (ulong) (k * virtualMachineInformation.pointerSize)
-                                          + (ulong) virtualMachineInformation.arrayHeaderSize;
+                                          + (ulong) (k * virtualMachineInformation.pointerSize.sizeInBytes())
+                                          + virtualMachineInformation.arrayHeaderSize;
                                 if (!memoryReader.ReadPointer(ptr).valueOut(out elementAddr)) {
                                     m_Snapshot.Error($"Can't read ptr={ptr:X} for k={k}, type='{elementType.name}'");
                                     break;
@@ -340,7 +340,7 @@ namespace HeapExplorer
                         if (!fieldType.isValueType)
                         {
                             var ptr =
-                                mo.staticBytes == null
+                                mo.staticBytes.isNone
                                 ? mo.address + (uint)field.offset
                                 : mo.address + (uint)field.offset - (uint)virtualMachineInformation.objectHeaderSize;
 
@@ -482,7 +482,7 @@ namespace HeapExplorer
                         PackedManagedObject.ArrayIndex.newStatic(staticField.staticFieldsArrayIndex),
                         managedTypesArrayIndex: fieldType.managedTypesArrayIndex 
                     );
-                    newObj.staticBytes = staticClass.staticFieldBytes;
+                    newObj.staticBytes = Some(staticClass.staticFieldBytes);
                     SetObjectSize(ref newObj, fieldType);
 
                     m_Crawl.Add(newObj);
@@ -650,14 +650,14 @@ namespace HeapExplorer
 
         void SetObjectSize(ref PackedManagedObject managedObj, PackedManagedType type)
         {
-            if (managedObj.size > 0)
+            if (managedObj.size.isSome)
                 return; // size is set already
 
             if (!m_MemoryReader.ReadObjectSize(managedObj.address, type).valueOut(out var objectSize)) {
                 Debug.LogError($"Can't read object size for managed object of type '{type.name}' at {managedObj.address:X}");
                 return;
             }
-            managedObj.size = objectSize.ToUIntClamped();
+            managedObj.size = Some(objectSize.ToUIntClamped());
         }
 
         void TryConnectNativeObject(ref PackedManagedObject managedObj)

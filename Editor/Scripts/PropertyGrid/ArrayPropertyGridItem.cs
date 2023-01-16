@@ -157,8 +157,8 @@ namespace HeapExplorer
             {
                 var pointer = m_MemoryReader.ReadPointer(
                     address 
-                    + (ulong)(elementIndex * m_Snapshot.virtualMachineInformation.pointerSize) 
-                    + (ulong)m_Snapshot.virtualMachineInformation.arrayHeaderSize
+                    + (ulong)(elementIndex * m_Snapshot.virtualMachineInformation.pointerSize.sizeInBytes()) 
+                    + m_Snapshot.virtualMachineInformation.arrayHeaderSize
                 ).getOrThrow();
                 var item = new ArrayPropertyGridItem(m_Owner, m_Snapshot, pointer, m_MemoryReader)
                 {
@@ -172,11 +172,15 @@ namespace HeapExplorer
             {
                 if (elementType.isPrimitive)
                 {
-                    var args = new BuildChildrenArgs();
-                    args.parent = this;
-                    args.type = elementType;
-                    args.address = address + (ulong)(elementIndex * elementType.size) + (ulong)m_Snapshot.virtualMachineInformation.arrayHeaderSize - (ulong)m_Snapshot.virtualMachineInformation.objectHeaderSize;
-                    args.memoryReader = new MemoryReader(m_Snapshot);
+                    var args = new BuildChildrenArgs {
+                        parent = this,
+                        type = elementType,
+                        address = address 
+                                  + (ulong)(elementIndex * elementType.size) 
+                                  + m_Snapshot.virtualMachineInformation.arrayHeaderSize 
+                                  - m_Snapshot.virtualMachineInformation.objectHeaderSize,
+                        memoryReader = new MemoryReader(m_Snapshot)
+                    };
                     add(args);
                 }
                 else
@@ -184,7 +188,9 @@ namespace HeapExplorer
                     // this is the container node for the array elements.
                     // if we don't add the container, all fields are simply added to the array node itself.
                     // however, we want each array element being groupped
-                    var pointer = address + (ulong)(elementIndex * elementType.size) + (ulong)m_Snapshot.virtualMachineInformation.arrayHeaderSize;
+                    var pointer = address 
+                                  + (ulong)(elementIndex * elementType.size) 
+                                  + m_Snapshot.virtualMachineInformation.arrayHeaderSize;
 
                     var item = new ArrayElementPropertyGridItem(m_Owner, m_Snapshot, pointer, new MemoryReader(m_Snapshot))
                     {
@@ -194,7 +200,11 @@ namespace HeapExplorer
                     item.Initialize();
                     this.AddChild(item);
 
-                    pointer = address + (ulong)(elementIndex * elementType.size) + (ulong)m_Snapshot.virtualMachineInformation.arrayHeaderSize - (ulong)m_Snapshot.virtualMachineInformation.objectHeaderSize;
+                    pointer = 
+                        address 
+                        + (ulong)(elementIndex * elementType.size) 
+                        + m_Snapshot.virtualMachineInformation.arrayHeaderSize 
+                        - m_Snapshot.virtualMachineInformation.objectHeaderSize;
 
                     var args = new BuildChildrenArgs();
                     args.parent = item;
@@ -207,7 +217,10 @@ namespace HeapExplorer
             else
             {
                 // address of element
-                var addressOfElement = address + (ulong)(elementIndex * m_Snapshot.virtualMachineInformation.pointerSize) + (ulong)m_Snapshot.virtualMachineInformation.arrayHeaderSize;
+                var addressOfElement = 
+                    address 
+                    + (ulong)(elementIndex * m_Snapshot.virtualMachineInformation.pointerSize.sizeInBytes()) 
+                    + m_Snapshot.virtualMachineInformation.arrayHeaderSize;
                 var pointer = m_MemoryReader.ReadPointer(addressOfElement).getOrThrow();
                 if (pointer != 0)
                 {

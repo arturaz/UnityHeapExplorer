@@ -226,7 +226,7 @@ namespace HeapExplorer
             else {
                 m_String = 
                     m_MemoryReader
-                        .ReadString(pointer + (ulong) m_Snapshot.virtualMachineInformation.objectHeaderSize)
+                        .ReadString(pointer + m_Snapshot.virtualMachineInformation.objectHeaderSize)
                         .getOrElse("<Error while reading>");
             }
 

@@ -382,7 +382,7 @@ namespace HeapExplorer
                 switch (reference.kind)
                 {
                     case PackedConnection.Kind.Managed:
-                        size = snapshot.managedObjects[reference.index].size;
+                        size = snapshot.managedObjects[reference.index].size.getOrElse(0);
                         address = snapshot.managedObjects[reference.index].address;
                         break;
 

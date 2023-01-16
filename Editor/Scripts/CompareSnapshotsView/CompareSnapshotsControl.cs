@@ -164,7 +164,9 @@ namespace HeapExplorer
 
                 var snapshot = snapshots[k];
 
-                parent.size[k] += (snapshot.gcHandles.Length * snapshot.virtualMachineInformation.pointerSize).ToUIntClamped();
+                parent.size[k] += (
+                    snapshot.gcHandles.Length * snapshot.virtualMachineInformation.pointerSize.sizeInBytes()
+                ).ToUIntClamped();
                 parent.count[k] += snapshot.gcHandles.Length;
             }
         }
