@@ -15,7 +15,7 @@ namespace HeapExplorer
         GCHandlesControl m_HandlesControl;
         HeSearchField m_HandlesSearchField;
         ConnectionsView m_ConnectionsView;
-        PackedGCHandle? m_Selected;
+        Option<PackedGCHandle> m_Selected;
         RootPathView m_RootPathView;
         float m_SplitterHorz = 0.33333f;
         float m_SplitterVert = 0.32f;
@@ -77,7 +77,7 @@ namespace HeapExplorer
 
         public override int CanProcessCommand(GotoCommand command)
         {
-            if (command.toGCHandle.HasValue)
+            if (command.toGCHandle.isSome)
                 return 10;
 
             return base.CanProcessCommand(command);
@@ -85,26 +85,26 @@ namespace HeapExplorer
 
         public override GotoCommand GetRestoreCommand()
         {
-            if (m_Selected.HasValue)
-                return new GotoCommand(new RichGCHandle(snapshot, m_Selected.Value.gcHandlesArrayIndex));
+            if (m_Selected.valueOut(out var gcHandle))
+                return new GotoCommand(new RichGCHandle(snapshot, gcHandle.gcHandlesArrayIndex));
 
             return base.GetRestoreCommand();
         }
 
         // Called if the selection changed in the list that contains the managed objects overview.
-        void OnListViewSelectionChange(PackedGCHandle? packedGCHandle)
+        void OnListViewSelectionChange(Option<PackedGCHandle> packedGCHandle)
         {
             m_Selected = packedGCHandle;
 
-            if (!packedGCHandle.HasValue)
+            if (!packedGCHandle.valueOut(out var gcHandle))
             {
                 m_RootPathView.Clear();
                 m_ConnectionsView.Clear();
                 return;
             }
 
-            m_ConnectionsView.Inspect(packedGCHandle.Value);
-            m_RootPathView.Inspect(m_Selected.Value);
+            m_ConnectionsView.Inspect(gcHandle);
+            m_RootPathView.Inspect(gcHandle);
         }
 
         public override void OnGUI()

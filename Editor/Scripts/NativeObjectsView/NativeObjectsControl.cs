@@ -3,6 +3,8 @@
 // https://github.com/pschraut/UnityHeapExplorer/
 //
 //#define HEAPEXPLORER_DISPLAY_REFS
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
@@ -201,11 +203,11 @@ namespace HeapExplorer
                     no.nativeTypesArrayIndex == m_Snapshot.coreTypes.nativeScriptableObject)
                 {
                     string monoScriptName;
-                    var monoScriptIndex = m_Snapshot.FindNativeMonoScriptType(no.nativeObjectsArrayIndex, out monoScriptName);
-                    if (monoScriptIndex != -1 && monoScriptIndex < m_Snapshot.nativeTypes.Length)
+                    var maybeMonoScript = m_Snapshot.FindNativeMonoScriptType(no.nativeObjectsArrayIndex);
+                    if (maybeMonoScript.valueOut(out var monoScript) && monoScript.index < m_Snapshot.nativeTypes.Length)
                     {
-                        typeNameOverride = monoScriptName;
-                        long key = (monoScriptName.GetHashCode() << 32) | monoScriptIndex;
+                        typeNameOverride = monoScript.monoScriptName;
+                        long key = (monoScript.monoScriptName.GetHashCode() << 32) | monoScript.index;
 
                         GroupItem group2;
                         if (!groupLookup.TryGetValue(key, out group2))
@@ -215,7 +217,7 @@ namespace HeapExplorer
                                 id = m_UniqueId++,
                                 depth = group.depth + 1,
                                 //displayName = monoScriptName,
-                                typeNameOverride = monoScriptName,
+                                typeNameOverride = monoScript.monoScriptName,
                             };
                             group2.Initialize(m_Snapshot, no.nativeTypesArrayIndex);
 
@@ -295,13 +297,13 @@ namespace HeapExplorer
                     continue;
 
                 var nativeType = m_Snapshot.nativeTypes[no.nativeTypesArrayIndex];
-                if (nativeType.managedTypeArrayIndex == -1)
+                if (!nativeType.managedTypeArrayIndex.valueOut(out var managedTypeArrayIndex))
                     continue;
 
-                if (m_Snapshot.IsSubclassOf(m_Snapshot.managedTypes[nativeType.managedTypeArrayIndex], m_Snapshot.coreTypes.unityEngineComponent))
+                if (m_Snapshot.IsSubclassOf(m_Snapshot.managedTypes[managedTypeArrayIndex], m_Snapshot.coreTypes.unityEngineComponent))
                     continue;
 
-                if (m_Snapshot.IsSubclassOf(m_Snapshot.managedTypes[nativeType.managedTypeArrayIndex], m_Snapshot.coreTypes.unityEngineGameObject))
+                if (m_Snapshot.IsSubclassOf(m_Snapshot.managedTypes[managedTypeArrayIndex], m_Snapshot.coreTypes.unityEngineGameObject))
                     continue;
 
                 var hash = new Hash128((uint)no.nativeTypesArrayIndex, (uint)no.size, (uint)no.name.GetHashCode(), 0);
@@ -374,10 +376,10 @@ namespace HeapExplorer
             switch ((Column)sortingColumn)
             {
                 case Column.Name:
-                    return string.Compare(itemB.name ?? "", itemA.name ?? "", true);
+                    return string.Compare(itemB.name ?? "", itemA.name ?? "", StringComparison.OrdinalIgnoreCase);
 
                 case Column.Type:
-                    return string.Compare(itemB.typeName, itemA.typeName, true);
+                    return string.Compare(itemB.typeName, itemA.typeName, StringComparison.OrdinalIgnoreCase);
 
                 case Column.Size:
                     return itemA.size.CompareTo(itemB.size);
@@ -563,11 +565,11 @@ namespace HeapExplorer
                 {
                     HeEditorGUI.NativeObjectIcon(HeEditorGUI.SpaceL(ref position, position.height), m_Object.packed);
 
-                    if (m_Object.managedObject.HasValue)
+                    if (m_Object.managedObject.valueOut(out var managedObject))
                     {
                         if (HeEditorGUI.CsButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_Object.managedObject));
+                            m_Owner.window.OnGoto(new GotoCommand(managedObject));
                         }
                     }
                 }

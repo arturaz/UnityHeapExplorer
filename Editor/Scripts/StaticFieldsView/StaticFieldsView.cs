@@ -6,12 +6,13 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor.IMGUI.Controls;
 using UnityEditor;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
     public class StaticFieldsView : HeapExplorerView
     {
-        RichManagedType? m_Selected;
+        Option<RichManagedType> m_Selected;
         StaticFieldsControl m_StaticFieldsControl;
         HeSearchField m_SearchField;
         PropertyGridView m_PropertyGridView;
@@ -146,7 +147,7 @@ namespace HeapExplorer
 
         public override int CanProcessCommand(GotoCommand command)
         {
-            if (command.toStaticField.HasValue || command.toManagedType.HasValue)
+            if (command.toStaticField.isSome || command.toManagedType.isSome)
                 return 10;
 
             return base.CanProcessCommand(command);
@@ -154,30 +155,28 @@ namespace HeapExplorer
 
         public override void RestoreCommand(GotoCommand command)
         {
-            if (command.toStaticField.HasValue)
-            {
-                m_StaticFieldsControl.Select(command.toStaticField.Value.classType.packed);
+            {if (command.toStaticField.valueOut(out var staticField)) {
+                m_StaticFieldsControl.Select(staticField.classType.packed);
                 return;
-            }
+            }}
 
-            if (command.toManagedType.HasValue)
-            {
-                m_StaticFieldsControl.Select(command.toManagedType.Value.packed);
-            }
+            {if (command.toManagedType.valueOut(out var managedType)) {
+                m_StaticFieldsControl.Select(managedType.packed);
+            }}
         }
 
         void OnListViewTypeSelected(PackedManagedType? type)
         {
             if (!type.HasValue)
             {
-                m_Selected = null;
+                m_Selected = None._;
                 m_ConnectionsView.Clear();
                 m_PropertyGridView.Clear();
                 return;
             }
 
             var selected = new RichManagedType(snapshot, type.Value.managedTypesArrayIndex);
-            m_Selected = selected;
+            m_Selected = Some(selected);
             var staticClass = selected.packed;
             var staticFields = new List<PackedManagedStaticField>();
 

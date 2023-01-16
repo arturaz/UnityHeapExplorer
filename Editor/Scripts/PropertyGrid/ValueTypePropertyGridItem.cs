@@ -24,7 +24,7 @@ namespace HeapExplorer
             type = m_Snapshot.managedTypes[field.managedTypesArrayIndex];
             displayName = field.name;
             displayType = type.name;
-            displayValue = m_MemoryReader.ReadFieldValueAsString(address, type);
+            displayValue = m_MemoryReader.ReadFieldValueAsString(address, type).getOrElse("<cannot read>");
             isExpandable = false;
 
             if (field.isStatic)

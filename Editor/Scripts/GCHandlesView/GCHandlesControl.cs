@@ -2,17 +2,20 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
+
+using System;
 using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor.IMGUI.Controls;
 using UnityEditor;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
     public class GCHandlesControl : AbstractTreeView
     {
-        public System.Action<PackedGCHandle?> onSelectionChange;
+        public System.Action<Option<PackedGCHandle>> onSelectionChange;
 
         PackedMemorySnapshot m_Snapshot;
         int m_UniqueId = 1;
@@ -81,11 +84,11 @@ namespace HeapExplorer
             var item = selectedItem as GCHandleItem;
             if (item == null)
             {
-                onSelectionChange.Invoke(null);
+                onSelectionChange.Invoke(None._);
                 return;
             }
 
-            onSelectionChange.Invoke(item.packed);
+            onSelectionChange.Invoke(Some(item.packed));
         }
 
         public TreeViewItem BuildTree(PackedMemorySnapshot snapshot)
@@ -168,7 +171,7 @@ namespace HeapExplorer
             switch ((Column)sortingColumn)
             {
                 case Column.GCHandle:
-                    return string.Compare(itemB.typeName, itemA.typeName, true);
+                    return string.Compare(itemB.typeName, itemA.typeName, StringComparison.OrdinalIgnoreCase);
 
                 case Column.Size:
                     return itemA.size.CompareTo(itemB.size);
@@ -222,7 +225,7 @@ namespace HeapExplorer
             {
                 get
                 {
-                    return m_GCHandle.managedObject?.type.name ?? "broken handle";
+                    return m_GCHandle.managedObject.fold("broken handle", _ => _.type.name);
                 }
             }
 

@@ -21,9 +21,9 @@ namespace HeapExplorer
 
         protected override void OnInitialize()
         {
-            var pointer = m_MemoryReader.ReadPointer(address);
-            var elementType = m_Snapshot.managedTypes[type.baseOrElementTypeIndex];
-            var dim0Length = address > 0 ? m_MemoryReader.ReadArrayLength(address, type, 0) : 0;
+            var pointer = m_MemoryReader.ReadPointer(address).getOrThrow();
+            var elementType = m_Snapshot.managedTypes[type.baseOrElementTypeIndex.getOrThrow()];
+            var dim0Length = address > 0 ? m_MemoryReader.ReadArrayLength(address, type, 0).getOrThrow() : 0;
 
             displayType = type.name;
             displayValue = "null";
@@ -71,8 +71,8 @@ namespace HeapExplorer
 
         void BuildOneDimArray(System.Action<BuildChildrenArgs> add)
         {
-            var arrayLength = m_MemoryReader.ReadArrayLength(address, type);
-            var elementType = m_Snapshot.managedTypes[type.baseOrElementTypeIndex];
+            var arrayLength = m_MemoryReader.ReadArrayLength(address, type).getOrThrow();
+            var elementType = m_Snapshot.managedTypes[type.baseOrElementTypeIndex.getOrThrow()];
 
             for (var n = 0; n < Mathf.Min(arrayLength, k_MaxItemsPerChunk); ++n)
             {
@@ -89,8 +89,8 @@ namespace HeapExplorer
 
         void BuildMultiDimArray(System.Action<BuildChildrenArgs> add)
         {
-            var arrayLength = m_MemoryReader.ReadArrayLength(address, type);
-            var elementType = m_Snapshot.managedTypes[type.baseOrElementTypeIndex];
+            var arrayLength = m_MemoryReader.ReadArrayLength(address, type).getOrThrow();
+            var elementType = m_Snapshot.managedTypes[type.baseOrElementTypeIndex.getOrThrow()];
 
             for (var n = 0; n < Mathf.Min(arrayLength, k_MaxItemsPerChunk); ++n)
             {
@@ -100,7 +100,7 @@ namespace HeapExplorer
             // an understandable way to name elements of an two dimensional array
             if (type.arrayRank == 2)
             {
-                var arrayLength2 = m_MemoryReader.ReadArrayLength(address, type, 1);
+                var arrayLength2 = m_MemoryReader.ReadArrayLength(address, type, 1).getOrThrow();
 
                 var x = 0;
                 var y = 0;
@@ -123,8 +123,8 @@ namespace HeapExplorer
             // complicated way of naming elements of three and more dimensional arrays
             if (type.arrayRank == 3)
             {
-                var arrayLength2 = m_MemoryReader.ReadArrayLength(address, type, 1);
-                var arrayLength3 = m_MemoryReader.ReadArrayLength(address, type, 2);
+                var arrayLength2 = m_MemoryReader.ReadArrayLength(address, type, 1).getOrThrow();
+                var arrayLength3 = m_MemoryReader.ReadArrayLength(address, type, 2).getOrThrow();
 
                 var x = 0;
                 var y = 0;
@@ -155,7 +155,11 @@ namespace HeapExplorer
         {
             if (elementType.isArray)
             {
-                var pointer = m_MemoryReader.ReadPointer(address + (ulong)(elementIndex * m_Snapshot.virtualMachineInformation.pointerSize) + (ulong)m_Snapshot.virtualMachineInformation.arrayHeaderSize);
+                var pointer = m_MemoryReader.ReadPointer(
+                    address 
+                    + (ulong)(elementIndex * m_Snapshot.virtualMachineInformation.pointerSize) 
+                    + (ulong)m_Snapshot.virtualMachineInformation.arrayHeaderSize
+                ).getOrThrow();
                 var item = new ArrayPropertyGridItem(m_Owner, m_Snapshot, pointer, m_MemoryReader)
                 {
                     depth = this.depth + 1,
@@ -204,11 +208,10 @@ namespace HeapExplorer
             {
                 // address of element
                 var addressOfElement = address + (ulong)(elementIndex * m_Snapshot.virtualMachineInformation.pointerSize) + (ulong)m_Snapshot.virtualMachineInformation.arrayHeaderSize;
-                var pointer = m_MemoryReader.ReadPointer(addressOfElement);
+                var pointer = m_MemoryReader.ReadPointer(addressOfElement).getOrThrow();
                 if (pointer != 0)
                 {
-                    var i = m_Snapshot.FindManagedObjectTypeOfAddress(pointer);
-                    if (i != -1)
+                    if (m_Snapshot.FindManagedObjectTypeOfAddress(pointer).valueOut(out var i))
                         elementType = m_Snapshot.managedTypes[i];
                 }
 

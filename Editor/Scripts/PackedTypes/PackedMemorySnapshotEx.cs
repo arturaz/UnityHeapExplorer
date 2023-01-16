@@ -9,6 +9,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using System;
+using System.Linq;
 using System.Threading;
 using static HeapExplorer.Option;
 
@@ -84,7 +85,7 @@ namespace HeapExplorer
         [NonSerialized] Dictionary<UInt64, int> m_FindManagedObjectOfNativeObjectLUT;
         [NonSerialized] Dictionary<UInt64, int> m_FindManagedTypeOfTypeInfoAddressLUT;
         [NonSerialized] Dictionary<UInt64, int> m_FindNativeObjectOfAddressLUT;
-        [NonSerialized] Dictionary<UInt64, int> m_FindManagedObjectOfAddressLUT;
+        [NonSerialized] Dictionary<UInt64, PackedManagedObject.ArrayIndex> m_FindManagedObjectOfAddressLUT;
         [NonSerialized] Dictionary<ulong, int> m_FindGCHandleOfTargetAddressLUT;
         [NonSerialized] Dictionary<UInt64, List<PackedConnection>> m_ConnectionsFrom = new Dictionary<ulong, List<PackedConnection>>(1024 * 32);
         [NonSerialized] Dictionary<UInt64, List<PackedConnection>> m_ConnectionsTo = new Dictionary<ulong, List<PackedConnection>>(1024 * 32);
@@ -197,24 +198,20 @@ namespace HeapExplorer
         /// Find the managed object at the specified address.
         /// </summary>
         /// <param name="managedObjectAddress">The managed object address.</param>
-        /// <returns>An index into the snapshot.managedObjects array on success, -1 otherwise.</returns>
-        public PackedManagedObject.ArrayIndex? FindManagedObjectOfAddress(UInt64 managedObjectAddress)
-        {
+        /// <returns>An index into the snapshot.managedObjects array on success, `None` otherwise.</returns>
+        public Option<PackedManagedObject.ArrayIndex> FindManagedObjectOfAddress(UInt64 managedObjectAddress) {
             if (managedObjectAddress == 0)
-                throw new ArgumentException("address should not be 0", nameof(managedObjectAddress));
+                return Utils.zeroAddressAccessError<PackedManagedObject.ArrayIndex>(nameof(managedObjectAddress));
 
             if (m_FindManagedObjectOfAddressLUT == null)
             {
-                m_FindManagedObjectOfAddressLUT = new Dictionary<ulong, int>(managedObjects.Length);
-                for (int n = 0, nend = managedObjects.Length; n < nend; ++n)
-                    m_FindManagedObjectOfAddressLUT[managedObjects[n].address] = n;
+                m_FindManagedObjectOfAddressLUT = new Dictionary<ulong, PackedManagedObject.ArrayIndex>(managedObjects.Length);
+                for (int n = 0, nend = managedObjects.Length; n < nend; ++n) {
+                    m_FindManagedObjectOfAddressLUT[managedObjects[n].address] = PackedManagedObject.ArrayIndex.newObject(n);
+                }
             }
 
-            int index;
-            if (m_FindManagedObjectOfAddressLUT.TryGetValue(managedObjectAddress, out index))
-                return index;
-
-            return null;
+            return m_FindManagedObjectOfAddressLUT.get(managedObjectAddress);
         }
 
         /// <summary>
@@ -339,21 +336,23 @@ namespace HeapExplorer
             }
         }
 
-        void GetConnectionsInternal(
-            PackedConnection.Pair pair, List<PackedConnection> references, List<PackedConnection> referencedBy
+        void GetConnectionsInternal<TReferences, TReferencedBy>(
+            PackedConnection.Pair pair, List<TReferences> references, List<TReferencedBy> referencedBy,
+            Func<PackedConnection, TReferences> convertReferences,
+            Func<PackedConnection, TReferencedBy> convertReferencedBy
         ) {
             var key = pair.ComputeConnectionKey();
 
             if (references != null)
             {
                 if (m_ConnectionsFrom.TryGetValue(key, out var refs))
-                    references.AddRange(refs);
+                    references.AddRange(refs.Select(convertReferences));
             }
 
             if (referencedBy != null)
             {
                 if (m_ConnectionsTo.TryGetValue(key, out var refsBy))
-                    referencedBy.AddRange(refsBy);
+                    referencedBy.AddRange(refsBy.Select(convertReferencedBy));
             }
         }
 
@@ -371,42 +370,70 @@ namespace HeapExplorer
                 referencedByCount = refBy.Count;
         }
 
-        public void GetConnections(
-            PackedManagedStaticField staticField, List<PackedConnection> references, List<PackedConnection> referencedBy
-        )
-        {
+        public void GetConnections<TReferences, TReferencedBy>(
+            PackedManagedStaticField staticField, List<TReferences> references, List<TReferencedBy> referencedBy,
+            Func<PackedConnection, TReferences> convertReferences,
+            Func<PackedConnection, TReferencedBy> convertReferencedBy
+        ) {
             GetConnectionsInternal(
                 new PackedConnection.Pair(PackedConnection.Kind.StaticField, staticField.staticFieldsArrayIndex), 
-                references, referencedBy
+                references, referencedBy, convertReferences, convertReferencedBy
             );
         }
+        
+        public void GetConnections(
+            PackedManagedStaticField staticField, List<PackedConnection> references, List<PackedConnection> referencedBy
+        ) => GetConnections(staticField, references, referencedBy, _ => _, _ => _);
 
-        public void GetConnections(PackedNativeUnityEngineObject nativeObj, List<PackedConnection> references, List<PackedConnection> referencedBy)
-        {
+        public void GetConnections<TReferences, TReferencedBy>(
+            PackedNativeUnityEngineObject nativeObj, List<TReferences> references, List<TReferencedBy> referencedBy,
+            Func<PackedConnection, TReferences> convertReferences,
+            Func<PackedConnection, TReferencedBy> convertReferencedBy
+        ) {
             GetConnectionsInternal(
                 new PackedConnection.Pair(PackedConnection.Kind.Native, nativeObj.nativeObjectsArrayIndex),
-                references, referencedBy
+                references, referencedBy, convertReferences, convertReferencedBy
             );
         }
 
-        public void GetConnections(PackedGCHandle gcHandle, List<PackedConnection> references, List<PackedConnection> referencedBy)
-        {
+        public void GetConnections(
+            PackedNativeUnityEngineObject nativeObj, List<PackedConnection> references, List<PackedConnection> referencedBy
+        ) => GetConnections(nativeObj, references, referencedBy, _ => _, _ => _);
+
+        public void GetConnections<TReferences, TReferencedBy>(
+            PackedGCHandle gcHandle, List<TReferences> references, List<TReferencedBy> referencedBy,
+            Func<PackedConnection, TReferences> convertReferences,
+            Func<PackedConnection, TReferencedBy> convertReferencedBy
+        ) {
             GetConnectionsInternal(
                 new PackedConnection.Pair(PackedConnection.Kind.GCHandle, gcHandle.gcHandlesArrayIndex), 
-                references, referencedBy
+                references, referencedBy, convertReferences, convertReferencedBy
             );
         }
 
-        public void GetConnections(PackedManagedObject managedObject, List<PackedConnection> references, List<PackedConnection> referencedBy)
-        {
+        public void GetConnections(
+            PackedGCHandle gcHandle, List<PackedConnection> references, List<PackedConnection> referencedBy
+        ) => GetConnections(gcHandle, references, referencedBy, _ => _, _ => _);
+
+        public void GetConnections<TReferences, TReferencedBy>(
+            PackedManagedObject managedObject, List<TReferences> references, List<TReferencedBy> referencedBy,
+            Func<PackedConnection, TReferences> convertReferences,
+            Func<PackedConnection, TReferencedBy> convertReferencedBy
+        ) {
             GetConnectionsInternal(
                 managedObject.managedObjectsArrayIndex.asPair, 
-                references, referencedBy
+                references, referencedBy, convertReferences, convertReferencedBy
             );
         }
 
-        public void GetConnections(PackedMemorySection memorySection, List<PackedConnection> references, List<PackedConnection> referencedBy)
-        {
+        public void GetConnections(
+            PackedManagedObject managedObject, List<PackedConnection> references, List<PackedConnection> referencedBy
+        ) => GetConnections(managedObject, references, referencedBy, _ => _, _ => _);
+
+        public void GetConnections<TTarget>(
+            PackedMemorySection memorySection, List<TTarget> referencesTo,
+            Func<PackedConnection.Pair, TTarget> convert
+        ) {
             if (memorySection.bytes == null || memorySection.bytes.Length == 0)
                 return;
 
@@ -417,9 +444,13 @@ namespace HeapExplorer
             {
                 var mo = managedObjects[n];
                 if (mo.address >= startAddress && mo.address < endAddress)
-                    references.Add(new PackedConnection() { toKind = PackedConnection.Kind.Managed, to = n });
+                    referencesTo.Add(convert(new PackedConnection.Pair(PackedConnection.Kind.Managed, n)));
             }
         }
+
+        public void GetConnections(
+            PackedMemorySection memorySection, List<PackedConnection.Pair> referencesTo
+        ) => GetConnections(memorySection, referencesTo, _ => _);
 
         public void GetConnectionsCount(PackedMemorySection memorySection, out int referencesCount)
         {
@@ -468,10 +499,10 @@ namespace HeapExplorer
             if (!type.isValueType)
                 return false;
 
-            if (type.baseOrElementTypeIndex == -1)
+            if (type.baseOrElementTypeIndex.isNone)
                 return false;
 
-            if (type.baseOrElementTypeIndex != coreTypes.systemEnum)
+            if (type.baseOrElementTypeIndex != Some(coreTypes.systemEnum))
                 return false;
 
             return true;
@@ -488,8 +519,8 @@ namespace HeapExplorer
             /// <summary>Index of the type in the array.</summary>
             int typeArrayIndex { get; }
             
-            /// <summary>Index of the base type in the array or -1 if this has no base type.</summary>
-            int baseTypeArrayIndex { get; }            
+            /// <summary>Index of the base type in the array or `None` if this has no base type.</summary>
+            Option<int> baseTypeArrayIndex { get; }            
         }
         
         public bool IsSubclassOf<T>(T type, T[] array, int baseTypeIndex) where T : TypeForSubclassSearch
@@ -503,8 +534,7 @@ namespace HeapExplorer
                 return false;
 
             var guard = 0;
-            while (currentType.baseTypeArrayIndex != -1)
-            {
+            {while (currentType.baseTypeArrayIndex.valueOut(out var baseTypeArrayIndex)) {
                 // safety code in case of an infinite loop
                 if (++guard > 64)
                 {
@@ -517,12 +547,12 @@ namespace HeapExplorer
                     return false;
                 }
 
-                if (currentType.baseTypeArrayIndex == baseTypeIndex)
+                if (baseTypeArrayIndex == baseTypeIndex)
                     return true;
 
                 // get type of the base class
-                currentType = array[currentType.baseTypeArrayIndex];
-            }
+                currentType = array[baseTypeArrayIndex];
+            }}
 
             return false;
         }
@@ -631,21 +661,17 @@ namespace HeapExplorer
 
                 var connection = connections[n];
 
-                connection.fromKind = PackedConnection.Kind.GCHandle;
-                if (connection.from >= nativeStart && connection.from < nativeEnd)
-                {
-                    connection.from -= nativeStart;
-                    connection.fromKind = PackedConnection.Kind.Native;
-                }
+                var newFrom =
+                    connection.from.index >= nativeStart && connection.from.index < nativeEnd
+                        ? new PackedConnection.Pair(PackedConnection.Kind.Native, connection.from.index - nativeStart)
+                        : new PackedConnection.Pair(PackedConnection.Kind.GCHandle, connection.from.index);
 
-                connection.toKind = PackedConnection.Kind.GCHandle;
-                if (connection.to >= nativeStart && connection.to < nativeEnd)
-                {
-                    connection.to -= nativeStart;
-                    connection.toKind = PackedConnection.Kind.Native;
-                }
+                var newTo =
+                    connection.to.index >= nativeStart && connection.to.index < nativeEnd
+                        ? new PackedConnection.Pair(PackedConnection.Kind.Native, connection.to.index - nativeStart)
+                        : new PackedConnection.Pair(PackedConnection.Kind.GCHandle, connection.to.index);
 
-                AddConnection(connection.fromKind, connection.from, connection.toKind, connection.to);
+                AddConnection(newFrom, newTo);
 
                 //if (connection.fromKind == PackedConnection.Kind.Native || nativeObjects[connection.from].nativeObjectAddress == 0x8E9D4FD0)
                 //    fromCount++;
@@ -717,9 +743,8 @@ namespace HeapExplorer
         {
             var currentType = type;
             var loopGuard = 0;
-            var typeIndex = currentType.managedTypesArrayIndex;
-            while (typeIndex >= 0 && typeIndex < managedTypes.Length)
-            {
+            var maybeTypeIndex = Some(currentType.managedTypesArrayIndex);
+            {while (maybeTypeIndex.valueOut(out var typeIndex)) {
                 if (++loopGuard > 64)
                 {
                     Error(
@@ -735,8 +760,8 @@ namespace HeapExplorer
                 if (ContainsFieldOfReferenceType(currentType))
                     return true;
 
-                typeIndex = currentType.baseOrElementTypeIndex;
-            }
+                maybeTypeIndex = currentType.baseOrElementTypeIndex;
+            }}
 
             return false;
         }

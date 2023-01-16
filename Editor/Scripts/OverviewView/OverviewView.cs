@@ -218,7 +218,7 @@ namespace HeapExplorer
                         GUILayout.Label("Total", GUILayout.Width(k_ColumnPercentageWidth));
                         GUILayout.Label(EditorUtility.FormatBytes(m_ManagedMemoryTotal), EditorStyles.boldLabel, GUILayout.Width(k_ColumnSizeWidth));
                         if (GUILayout.Button("Investigate"))
-                            window.OnGoto(new GotoCommand(new RichManagedObject(snapshot, 0)));
+                            window.OnGoto(new GotoCommand(new RichManagedObject(snapshot, PackedManagedObject.ArrayIndex.newObject(0))));
                     }
                 }
 

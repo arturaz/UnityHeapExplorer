@@ -3,6 +3,7 @@
 // https://github.com/pschraut/UnityHeapExplorer/
 //
 using System;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
@@ -12,15 +13,15 @@ namespace HeapExplorer
     {
         /// <summary>
         /// The index used to obtain the native C++ base class description from the
-        /// <see cref="PackedMemorySnapshot.nativeTypes"/> array.
+        /// <see cref="PackedMemorySnapshot.nativeTypes"/> array or `None` if this has no base type.
         /// </summary>
-        public int nativeBaseTypeArrayIndex;
+        public Option<int> nativeBaseTypeArrayIndex;
 
         [NonSerialized]
         public System.Int32 nativeTypeArrayIndex;
 
         [NonSerialized]
-        public System.Int32 managedTypeArrayIndex;
+        public Option<int> managedTypeArrayIndex;
 
         // Number of all objects of this type.
         [NonSerialized]
@@ -34,29 +35,15 @@ namespace HeapExplorer
         public System.String name;
 
         /// <inheritdoc/>
-        string PackedMemorySnapshot.TypeForSubclassSearch.name {
-            get { return name; }
-        }
+        string PackedMemorySnapshot.TypeForSubclassSearch.name => name;
 
         /// <inheritdoc/>
-        int PackedMemorySnapshot.TypeForSubclassSearch.typeArrayIndex {
-            get { return nativeTypeArrayIndex; }
-        }
+        int PackedMemorySnapshot.TypeForSubclassSearch.typeArrayIndex => nativeTypeArrayIndex;
 
         /// <inheritdoc/>
-        int PackedMemorySnapshot.TypeForSubclassSearch.baseTypeArrayIndex {
-            get { return nativeBaseTypeArrayIndex; }
-        }
+        Option<int> PackedMemorySnapshot.TypeForSubclassSearch.baseTypeArrayIndex => nativeBaseTypeArrayIndex;
 
         const System.Int32 k_Version = 1;
-
-        public static readonly PackedNativeType invalid = new PackedNativeType()
-        {
-            name = "<invalid>",
-            nativeBaseTypeArrayIndex = -1,
-            nativeTypeArrayIndex = -1,
-            managedTypeArrayIndex = -1
-        };
 
         /// <summary>
         /// Writes a PackedNativeType array to the specified writer.
@@ -69,7 +56,7 @@ namespace HeapExplorer
             for (int n = 0, nend = value.Length; n < nend; ++n)
             {
                 writer.Write(value[n].name);
-                writer.Write(value[n].nativeBaseTypeArrayIndex);
+                writer.Write(value[n].nativeBaseTypeArrayIndex.getOrElse(-1));
             }
         }
 
@@ -92,9 +79,11 @@ namespace HeapExplorer
                 for (int n = 0, nend = value.Length; n < nend; ++n)
                 {
                     value[n].name = reader.ReadString();
-                    value[n].nativeBaseTypeArrayIndex = reader.ReadInt32();
+                    var nativeBaseTypeArrayIndex = reader.ReadInt32();
+                    value[n].nativeBaseTypeArrayIndex = 
+                        nativeBaseTypeArrayIndex == -1 ? None._ : Some(nativeBaseTypeArrayIndex);
                     value[n].nativeTypeArrayIndex = n;
-                    value[n].managedTypeArrayIndex = -1;
+                    value[n].managedTypeArrayIndex = None._;
                 }
             }
         }
@@ -108,18 +97,20 @@ namespace HeapExplorer
             source.typeName.GetEntries(0, source.typeName.GetNumEntries(), ref sourceTypeName);
 
             var sourceNativeBaseTypeArrayIndex = new int[source.nativeBaseTypeArrayIndex.GetNumEntries()];
-            source.nativeBaseTypeArrayIndex.GetEntries(0, source.nativeBaseTypeArrayIndex.GetNumEntries(), ref sourceNativeBaseTypeArrayIndex);
+            source.nativeBaseTypeArrayIndex.GetEntries(
+                0, source.nativeBaseTypeArrayIndex.GetNumEntries(), ref sourceNativeBaseTypeArrayIndex
+            );
 
-            for (int n = 0, nend = value.Length; n < nend; ++n)
-            {
+            for (int n = 0, nend = value.Length; n < nend; ++n) {
+                var nativeBaseTypeArrayIndex = sourceNativeBaseTypeArrayIndex[n];
                 value[n] = new PackedNativeType
                 {
                     name = sourceTypeName[n],
-                    nativeBaseTypeArrayIndex = sourceNativeBaseTypeArrayIndex[n],
+                    nativeBaseTypeArrayIndex = nativeBaseTypeArrayIndex == -1 ? None._ : Some(nativeBaseTypeArrayIndex),
                     nativeTypeArrayIndex = n,
-                    managedTypeArrayIndex = -1,
+                    managedTypeArrayIndex = None._,
                 };
-            };
+            }
 
             return value;
         }

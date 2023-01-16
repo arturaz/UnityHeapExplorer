@@ -6,6 +6,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
@@ -29,12 +30,12 @@ namespace HeapExplorer
 
         public RichNativeType type => new RichNativeType(snapshot, packed.nativeTypesArrayIndex);
 
-        public RichManagedObject? managedObject =>
+        public Option<RichManagedObject> managedObject =>
             packed.managedObjectsArrayIndex.valueOut(out var index)
-                    ? new RichManagedObject(snapshot, index)
-                    : (RichManagedObject?) null;
+                ? Some(new RichManagedObject(snapshot, index))
+                : None._;
 
-        public RichGCHandle? gcHandle => managedObject?.gcHandle;
+        public Option<RichGCHandle> gcHandle => managedObject.flatMap(_ => _.gcHandle);
 
         public string name => packed.name;
 
@@ -52,14 +53,12 @@ namespace HeapExplorer
 
         public ulong size => packed.size;
 
-        public void GetConnections(List<PackedConnection> references, List<PackedConnection> referencedBy)
-        {
-            snapshot.GetConnections(packed, references, referencedBy);
-        }
-
         public void GetConnectionsCount(out int referencesCount, out int referencedByCount)
         {
-            snapshot.GetConnectionsCount(PackedConnection.Kind.Native, nativeObjectsArrayIndex, out referencesCount, out referencedByCount);
+            snapshot.GetConnectionsCount(
+                new PackedConnection.Pair(PackedConnection.Kind.Native, nativeObjectsArrayIndex), 
+                out referencesCount, out referencedByCount
+            );
         }
 
         public readonly PackedMemorySnapshot snapshot;

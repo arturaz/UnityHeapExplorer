@@ -5,6 +5,7 @@
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
@@ -14,7 +15,7 @@ namespace HeapExplorer
         ManagedObjectDuplicatesControl m_ObjectsControl;
         HeSearchField m_ObjectsSearchField;
         ConnectionsView m_ConnectionsView;
-        RichManagedObject? m_Selected;
+        Option<RichManagedObject> m_Selected;
         RootPathView m_RootPathView;
         PropertyGridView m_PropertyGridView;
         float m_SplitterHorzPropertyGrid = 0.32f;
@@ -81,7 +82,7 @@ namespace HeapExplorer
 
         void OnListViewSelectionChange(PackedManagedObject? item)
         {
-            m_Selected = null;
+            m_Selected = None._;
             if (!item.HasValue)
             {
                 m_RootPathView.Clear();
@@ -91,7 +92,7 @@ namespace HeapExplorer
             }
 
             var selected = new RichManagedObject(snapshot, item.Value.managedObjectsArrayIndex);
-            m_Selected = selected;
+            m_Selected = Some(selected);
             m_PropertyGridView.Inspect(selected.packed);
             m_ConnectionsView.Inspect(selected.packed);
             m_RootPathView.Inspect(selected.packed);

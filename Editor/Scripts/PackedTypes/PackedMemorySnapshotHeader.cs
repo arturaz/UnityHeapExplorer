@@ -72,7 +72,7 @@ namespace HeapExplorer
             stateString = "Loading Header";
 
             value.snapshotMagic = reader.ReadInt32();
-            if (!value.HasValue)
+            if (!value.isValid)
                 return;
 
             value.snapshotVersion = reader.ReadInt32();

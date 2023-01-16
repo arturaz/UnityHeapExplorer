@@ -26,7 +26,7 @@ namespace HeapExplorer
 
         public PackedManagedStaticField packed => snapshot.managedStaticFields[managedStaticFieldsArrayIndex];
 
-        public RichManagedType? fieldType
+        public RichManagedType fieldType
         {
             get
             {

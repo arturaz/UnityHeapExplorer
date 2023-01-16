@@ -5,12 +5,13 @@
 //#define HEAPEXPLORER_DISPLAY_REFS
 using UnityEngine;
 using UnityEditor.IMGUI.Controls;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
     public class ManagedHeapSectionsControl : AbstractTreeView
     {
-        public System.Action<PackedMemorySection?> onSelectionChange;
+        public System.Action<Option<PackedMemorySection>> onSelectionChange;
 
         public int count
         {
@@ -70,12 +71,12 @@ namespace HeapExplorer
             var item = selectedItem as HeapSectionItem;
             if (item == null)
             {
-                onSelectionChange.Invoke(null);
+                onSelectionChange.Invoke(None._);
                 return;
             }
 
             var section = m_Snapshot.managedHeapSections[item.arrayIndex];
-            onSelectionChange.Invoke(section);
+            onSelectionChange.Invoke(Some(section));
         }
 
         //public TreeViewItem BuildTree(PackedMemorySnapshot snapshot, bool removeUnalignedSections = false)

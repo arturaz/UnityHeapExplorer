@@ -4,6 +4,7 @@
 //
 
 using System;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
@@ -28,12 +29,12 @@ namespace HeapExplorer
 
         public PackedGCHandle packed => snapshot.gcHandles[gcHandleArrayIndex];
 
-        public RichManagedObject? managedObject =>
+        public Option<RichManagedObject> managedObject =>
             packed.managedObjectsArrayIndex.valueOut(out var index)
-                ? new RichManagedObject(snapshot, index)
-                : (RichManagedObject?) null;
+                ? Some(new RichManagedObject(snapshot, index))
+                : None._;
 
-        public RichNativeObject? nativeObject => managedObject?.nativeObject;
+        public Option<RichNativeObject> nativeObject => managedObject.flatMap(_ => _.nativeObject);
 
         public ulong managedObjectAddress => packed.target;
 

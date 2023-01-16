@@ -155,7 +155,7 @@ namespace HeapExplorer
             //if (AbstractDataVisualizer.HasVisualizer(type.name))
             {
                 if (type.isPointer && resolveAddress)
-                    address = reader.ReadPointer(address);
+                    address = reader.ReadPointer(address).getOrThrow();
 
                 m_DataVisualizer = AbstractDataVisualizer.CreateVisualizer(type.name);
                 m_DataVisualizer.Initialize(m_Snapshot, reader, address, type);
@@ -221,7 +221,7 @@ namespace HeapExplorer
             // Add the base class, if any, to the tree.
             if (type.isDerivedReferenceType && !type.isArray)
             {
-                var baseType = m_Snapshot.managedTypes[type.baseOrElementTypeIndex];
+                var baseType = m_Snapshot.managedTypes[type.baseOrElementTypeIndex.getOrThrow()];
                 var isSystemObject = baseType.managedTypesArrayIndex == m_Snapshot.coreTypes.systemObject;
                 if (!isSystemObject && PackedManagedTypeUtility.HasTypeOrBaseAnyField(m_Snapshot, baseType, !addStatic, addStatic))
                 {
@@ -245,7 +245,7 @@ namespace HeapExplorer
                 // {
                 //   static readonly T[] _EmptyArray = new T[0];
                 // }
-                if (type.baseOrElementTypeIndex == -1)
+                if (type.baseOrElementTypeIndex.isNone)
                     return;
 
                 var pointer = address;
@@ -276,10 +276,10 @@ namespace HeapExplorer
                 // Array
                 if (fieldType.isArray)
                 {
-                    if (fieldType.baseOrElementTypeIndex == -1)
+                    if (fieldType.baseOrElementTypeIndex.isNone)
                         continue;
 
-                    var pointer = reader.ReadPointer(address + (ulong)type.fields[n].offset);
+                    var pointer = reader.ReadPointer(address + (ulong)type.fields[n].offset).getOrThrow();
                     var item = new ArrayPropertyGridItem(this, m_Snapshot, pointer, new MemoryReader(m_Snapshot))
                     {
                         depth = target.depth + 1,

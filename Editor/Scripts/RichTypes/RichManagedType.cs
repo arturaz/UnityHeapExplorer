@@ -58,10 +58,10 @@ namespace HeapExplorer
                     break;
                 }
 
-                if (me.baseOrElementTypeIndex == -1)
+                if (!me.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex))
                     break;
 
-                me = snapshot.managedTypes[me.baseOrElementTypeIndex];
+                me = snapshot.managedTypes[baseOrElementTypeIndex];
             }
 
             packedManagedField = default;
@@ -81,17 +81,17 @@ namespace HeapExplorer
                 return true;
 
             var guard = 0;
-            while (me.baseOrElementTypeIndex != -1)
+            while (me.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex))
             {
                 if (++guard > 64) {
                     Debug.LogError($"Guard hit in {nameof(IsSubclassOf)}({t.name}) at type '{me.name}'");
                     break; // no inheritance should have more depths than this
                 }
 
-                if (me.baseOrElementTypeIndex == t.managedTypesArrayIndex)
+                if (baseOrElementTypeIndex == t.managedTypesArrayIndex)
                     return true;
 
-                me = snapshot.managedTypes[me.baseOrElementTypeIndex];
+                me = snapshot.managedTypes[baseOrElementTypeIndex];
             }
 
             return false;

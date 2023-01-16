@@ -30,7 +30,7 @@ namespace HeapExplorer
 
         public override int CanProcessCommand(GotoCommand command)
         {
-            if (command.toNativeObject.HasValue)
+            if (command.toNativeObject.isSome)
                 return 10;
 
             return base.CanProcessCommand(command);

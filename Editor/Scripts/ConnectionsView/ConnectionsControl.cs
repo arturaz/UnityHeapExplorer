@@ -2,10 +2,13 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
+
+using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor.IMGUI.Controls;
 using UnityEditor;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
@@ -13,11 +16,11 @@ namespace HeapExplorer
     {
         public HeapExplorerView fromView;
         public HeapExplorerView toView;
-        public RichGCHandle? toGCHandle;
-        public RichManagedObject? toManagedObject;
-        public RichNativeObject? toNativeObject;
-        public RichStaticField? toStaticField;
-        public RichManagedType? toManagedType;
+        public Option<RichGCHandle> toGCHandle;
+        public Option<RichManagedObject> toManagedObject;
+        public Option<RichNativeObject> toNativeObject;
+        public Option<RichStaticField> toStaticField;
+        public Option<RichManagedType> toManagedType;
 
         public GotoCommand()
         {
@@ -26,31 +29,31 @@ namespace HeapExplorer
         public GotoCommand(RichGCHandle value)
             : this()
         {
-            toGCHandle = value;
+            toGCHandle = Some(value);
         }
 
         public GotoCommand(RichManagedObject value)
             : this()
         {
-            toManagedObject = value;
+            toManagedObject = Some(value);
         }
 
         public GotoCommand(RichNativeObject value)
             : this()
         {
-            toNativeObject = value;
+            toNativeObject = Some(value);
         }
 
         public GotoCommand(RichStaticField value)
             : this()
         {
-            toStaticField = value;
+            toStaticField = Some(value);
         }
 
         public GotoCommand(RichManagedType value)
             : this()
         {
-            toManagedType = value;
+            toManagedType = Some(value);
         }
     }
 
@@ -132,9 +135,7 @@ namespace HeapExplorer
         }
 
         PackedMemorySnapshot m_Snapshot;
-        PackedConnection[] m_Connections;
-        bool m_AddFrom;
-        bool m_AddTo;
+        PackedConnection.Pair[] m_Connections;
         int m_UniqueId = 1;
 
         enum Column
@@ -160,12 +161,10 @@ namespace HeapExplorer
             Reload();
         }
 
-        public TreeViewItem BuildTree(PackedMemorySnapshot snapshot, PackedConnection[] connections, bool addFrom, bool addTo)
+        public TreeViewItem BuildTree(PackedMemorySnapshot snapshot, PackedConnection.Pair[] connections)
         {
             m_Snapshot = snapshot;
             m_Connections = connections;
-            m_AddFrom = addFrom;
-            m_AddTo = addTo;
 
             m_UniqueId = 1;
 
@@ -183,48 +182,25 @@ namespace HeapExplorer
 
                 var connection = m_Connections[n];
 
-                if (m_AddTo)
+                switch (connection.kind)
                 {
-                    switch (connection.toKind)
-                    {
-                        case PackedConnection.Kind.GCHandle:
-                            AddGCHandle(root, m_Snapshot.gcHandles[connection.to]);
-                            break;
+                    case PackedConnection.Kind.GCHandle:
+                        AddGCHandle(root, m_Snapshot.gcHandles[connection.index]);
+                        break;
 
-                        case PackedConnection.Kind.Managed:
-                            AddManagedObject(root, m_Snapshot.managedObjects[connection.to]);
-                            break;
+                    case PackedConnection.Kind.Managed:
+                        AddManagedObject(root, m_Snapshot.managedObjects[connection.index]);
+                        break;
 
-                        case PackedConnection.Kind.Native:
-                            AddNativeUnityObject(root, m_Snapshot.nativeObjects[connection.to]);
-                            break;
+                    case PackedConnection.Kind.Native:
+                        AddNativeUnityObject(root, m_Snapshot.nativeObjects[connection.index]);
+                        break;
 
-                        case PackedConnection.Kind.StaticField:
-                            AddStaticField(root, m_Snapshot.managedStaticFields[connection.to]);
-                            break;
-                    }
-                }
-
-                if (m_AddFrom)
-                {
-                    switch (connection.fromKind)
-                    {
-                        case PackedConnection.Kind.GCHandle:
-                            AddGCHandle(root, m_Snapshot.gcHandles[connection.from]);
-                            break;
-
-                        case PackedConnection.Kind.Managed:
-                            AddManagedObject(root, m_Snapshot.managedObjects[connection.from]);
-                            break;
-
-                        case PackedConnection.Kind.Native:
-                            AddNativeUnityObject(root, m_Snapshot.nativeObjects[connection.from]);
-                            break;
-
-                        case PackedConnection.Kind.StaticField:
-                            AddStaticField(root, m_Snapshot.managedStaticFields[connection.from]);
-                            break;
-                    }
+                    case PackedConnection.Kind.StaticField:
+                        AddStaticField(root, m_Snapshot.managedStaticFields[connection.index]);
+                        break;
+                    default:
+                        throw new ArgumentOutOfRangeException(nameof(connection.kind), connection.kind, "unknown kind");
                 }
             }
 
@@ -483,11 +459,10 @@ namespace HeapExplorer
                 // It makes it easier to understand what it is, otherwise everything displays 'MonoBehaviour' only.
                 if (m_NativeObject.type.IsSubclassOf(m_Snapshot.coreTypes.nativeMonoBehaviour) || m_NativeObject.type.IsSubclassOf(m_Snapshot.coreTypes.nativeScriptableObject))
                 {
-                    string monoScriptName;
-                    if (m_Snapshot.FindNativeMonoScriptType(m_NativeObject.packed.nativeObjectsArrayIndex, out monoScriptName) != -1)
+                    if (m_Snapshot.FindNativeMonoScriptType(m_NativeObject.packed.nativeObjectsArrayIndex).valueOut(out var tpl))
                     {
-                        if (!string.IsNullOrEmpty(monoScriptName))
-                            displayName = monoScriptName;
+                        if (!string.IsNullOrEmpty(tpl.monoScriptName))
+                            displayName = tpl.monoScriptName;
                     }
                 }
             }

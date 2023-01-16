@@ -4,6 +4,7 @@
 //
 
 using System;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
@@ -27,13 +28,10 @@ namespace HeapExplorer
         public PackedNativeType packed => snapshot.nativeTypes[nativeTypesArrayIndex];
         public string name => packed.name;
 
-        public RichNativeType? baseType
-        {
-            get {
-                var t = packed;
-                return t.nativeBaseTypeArrayIndex < 0 ? null : new RichNativeType(snapshot, t.nativeBaseTypeArrayIndex);
-            }
-        }
+        public Option<RichNativeType> baseType =>
+            packed.nativeBaseTypeArrayIndex.valueOut(out var index)
+                ? Some(new RichNativeType(snapshot, index))
+                : None._; 
 
         /// <summary>
         /// Gets whether this native type is a subclass of the specified baseType.

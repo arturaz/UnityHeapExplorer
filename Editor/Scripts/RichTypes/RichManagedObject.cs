@@ -4,6 +4,7 @@
 //
 
 using System;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
@@ -31,15 +32,15 @@ namespace HeapExplorer
 
         public RichManagedType type => new RichManagedType(snapshot, packed.managedTypesArrayIndex);
 
-        public RichGCHandle? gcHandle =>
+        public Option<RichGCHandle> gcHandle =>
             packed.gcHandlesArrayIndex.valueOut(out var index) 
-                ? new RichGCHandle(snapshot, index) 
-                : (RichGCHandle?) null;
+                ? Some(new RichGCHandle(snapshot, index)) 
+                : None._;
 
-        public RichNativeObject? nativeObject =>
+        public Option<RichNativeObject> nativeObject =>
             packed.nativeObjectsArrayIndex.valueOut(out var index) 
-                    ? new RichNativeObject(snapshot, index)
-                    : (RichNativeObject?) null;
+                ? Some(new RichNativeObject(snapshot, index))
+                : None._;
 
         public override string ToString() =>
             // We output the address with '0x' prefix to make it comfortable to copy and paste it into an exact search

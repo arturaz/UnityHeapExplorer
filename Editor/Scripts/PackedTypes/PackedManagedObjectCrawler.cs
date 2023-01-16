@@ -6,10 +6,8 @@
 //#define DEBUG_BREAK_ON_ADDRESS
 //#define ENABLE_PROFILING
 //#define ENABLE_PROFILER
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
 using System;
 using static HeapExplorer.Option;
 
@@ -184,20 +182,31 @@ namespace HeapExplorer
 
                     if (baseType.isArray)
                     {
-                        if (baseType.baseOrElementTypeIndex < 0 || baseType.baseOrElementTypeIndex >= m_Snapshot.managedTypes.Length)
-                        {
-                            m_Snapshot.Error("'{0}.baseOrElementTypeIndex' = {1} at address '{2:X}', ignoring managed object.", baseType.name, baseType.baseOrElementTypeIndex, mo.address);
+                        if (
+                            !baseType.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex) 
+                            || baseOrElementTypeIndex >= m_Snapshot.managedTypes.Length
+                        ) {
+                            m_Snapshot.Error("'{0}.baseOrElementTypeIndex' = {1} at address '{2:X}', ignoring managed object.", baseType.name, baseOrElementTypeIndex, mo.address);
                             break;
                         }
 
-                        var elementType = m_Snapshot.managedTypes[baseType.baseOrElementTypeIndex];
+                        var elementType = m_Snapshot.managedTypes[baseOrElementTypeIndex];
                         if (elementType.isValueType && elementType.isPrimitive)
                             break; // don't crawl int[], byte[], etc
 
                         if (elementType.isValueType && !ContainsReferenceType(elementType.managedTypesArrayIndex))
                             break;
 
-                        var dim0Length = mo.address > 0 ? memoryReader.ReadArrayLength(mo.address, baseType) : 0;
+                        int dim0Length;
+                        if (mo.address > 0) {
+                            if (!memoryReader.ReadArrayLength(mo.address, baseType).valueOut(out dim0Length)) {
+                                m_Snapshot.Error($"Can't determine array length for array at {mo.address:X}");
+                                break;
+                            }
+                        }
+                        else
+                            dim0Length = 0;
+                        
                         //if (dim0Length > 1024 * 1024)
                         if (dim0Length > (32*1024) * (32*1024))
                         {
@@ -210,19 +219,33 @@ namespace HeapExplorer
                             if ((m_TotalCrawled % 1000) == 0)
                                 UpdateProgress();
 
-                            ulong elementAddr = 0;
+                            ulong elementAddr;
 
-                            if (elementType.isArray)
-                            {
-                                elementAddr = memoryReader.ReadPointer(mo.address + (ulong)(k * virtualMachineInformation.pointerSize) + (ulong)virtualMachineInformation.arrayHeaderSize);
+                            if (elementType.isArray) {
+                                var ptr = mo.address
+                                          + (ulong) (k * virtualMachineInformation.pointerSize)
+                                          + (ulong) virtualMachineInformation.arrayHeaderSize;
+                                if (!memoryReader.ReadPointer(ptr).valueOut(out elementAddr)) {
+                                    m_Snapshot.Error($"Can't read ptr={ptr:X} for k={k}, type='{elementType.name}'");
+                                    break;
+                                }
                             }
                             else if (elementType.isValueType)
                             {
-                                elementAddr = mo.address + (ulong)(k * elementType.size) + (ulong)virtualMachineInformation.arrayHeaderSize - (ulong)virtualMachineInformation.objectHeaderSize;
+                                elementAddr = 
+                                    mo.address 
+                                    + (ulong)(k * elementType.size) 
+                                    + (ulong)virtualMachineInformation.arrayHeaderSize 
+                                    - (ulong)virtualMachineInformation.objectHeaderSize;
                             }
-                            else
-                            {
-                                elementAddr = memoryReader.ReadPointer(mo.address + (ulong)(k * virtualMachineInformation.pointerSize) + (ulong)virtualMachineInformation.arrayHeaderSize);
+                            else {
+                                var ptr = mo.address
+                                          + (ulong) (k * virtualMachineInformation.pointerSize)
+                                          + (ulong) virtualMachineInformation.arrayHeaderSize;
+                                if (!memoryReader.ReadPointer(ptr).valueOut(out elementAddr)) {
+                                    m_Snapshot.Error($"Can't read ptr={ptr:X} for k={k}, type='{elementType.name}'");
+                                    break;
+                                }
                             }
 
 #if DEBUG_BREAK_ON_ADDRESS
@@ -234,14 +257,14 @@ namespace HeapExplorer
 
                             if (elementAddr != 0)
                             {
-                                if (!m_Seen.TryGetValue(elementAddr, out var newObjectIndex))
-                                {
+                                if (!m_Seen.TryGetValue(elementAddr, out var newObjectIndex)) {
+                                    var managedTypesArrayIndex = elementType.managedTypesArrayIndex;
+                                    var managedObjectsArrayIndex = 
+                                        PackedManagedObject.ArrayIndex.newObject(m_ManagedObjects.Count);
                                     var newObj = PackedManagedObject.New(
                                         address: elementAddr,
-                                        managedTypesArrayIndex: elementType.managedTypesArrayIndex,
-                                        managedObjectsArrayIndex: PackedManagedObject.ArrayIndex.newObject(
-                                            m_ManagedObjects.Count
-                                        )
+                                        managedTypesArrayIndex: managedTypesArrayIndex,
+                                        managedObjectsArrayIndex: managedObjectsArrayIndex
                                     );
 
                                     if (elementType.isValueType)
@@ -251,9 +274,9 @@ namespace HeapExplorer
                                     }
                                     else
                                     {
-                                        newObj.managedTypesArrayIndex = m_Snapshot.FindManagedObjectTypeOfAddress(elementAddr);
-                                        if (newObj.managedTypesArrayIndex == -1)
-                                            newObj.managedTypesArrayIndex = elementType.managedTypesArrayIndex;
+                                        newObj.managedTypesArrayIndex = 
+                                            m_Snapshot.FindManagedObjectTypeOfAddress(elementAddr)
+                                                .getOrElse(elementType.managedTypesArrayIndex);
 
                                         TryConnectNativeObject(ref newObj);
                                     }
@@ -316,11 +339,15 @@ namespace HeapExplorer
 
                         if (!fieldType.isValueType)
                         {
-                            ulong addr = 0;
-                            if (mo.staticBytes == null)
-                                addr = memoryReader.ReadPointer(mo.address + (uint)field.offset);
-                            else
-                                addr = memoryReader.ReadPointer(mo.address + (uint)field.offset - (uint)virtualMachineInformation.objectHeaderSize);
+                            var ptr =
+                                mo.staticBytes == null
+                                ? mo.address + (uint)field.offset
+                                : mo.address + (uint)field.offset - (uint)virtualMachineInformation.objectHeaderSize;
+
+                            if (!memoryReader.ReadPointer(ptr).valueOut(out var addr)) {
+                                Debug.LogError($"Can't read ptr={ptr:X} for fieldType='{fieldType.name}'");
+                                break;
+                            }
 
                             if (addr == 0)
                                 continue;
@@ -358,10 +385,10 @@ namespace HeapExplorer
                         }
                     }
 
-                    if (typeIndex == baseType.baseOrElementTypeIndex || baseType.isArray)
+                    if (Some(typeIndex) == baseType.baseOrElementTypeIndex || baseType.isArray)
                         break;
 
-                    typeIndex = baseType.baseOrElementTypeIndex;
+                    typeIndex = baseType.baseOrElementTypeIndex.getOrThrow();
                 }
             }
 
@@ -465,7 +492,10 @@ namespace HeapExplorer
                 // we need to do it to create a new ManagedObject and add it to the list to crawl.
                 else
                 {
-                    var addr = staticReader.ReadPointer((uint)field.offset);
+                    if (!staticReader.ReadPointer((uint) field.offset).valueOut(out var addr)) {
+                        m_Snapshot.Error($"Can't do `staticReader.ReadPointer(field.offset={field.offset})`");
+                        continue;
+                    }
                     if (addr == 0)
                         continue;
 
@@ -623,7 +653,11 @@ namespace HeapExplorer
             if (managedObj.size > 0)
                 return; // size is set already
 
-            managedObj.size = m_MemoryReader.ReadObjectSize(managedObj.address, type).ToUIntClamped();
+            if (!m_MemoryReader.ReadObjectSize(managedObj.address, type).valueOut(out var objectSize)) {
+                Debug.LogError($"Can't read object size for managed object of type '{type.name}' at {managedObj.address:X}");
+                return;
+            }
+            managedObj.size = objectSize.ToUIntClamped();
         }
 
         void TryConnectNativeObject(ref PackedManagedObject managedObj)
@@ -642,7 +676,15 @@ namespace HeapExplorer
 
             BeginProfilerSample("ReadPointer");
             // Read the m_cachePtr value
-            var nativeObjectAddress = m_MemoryReader.ReadPointer(managedObj.address + (uint)m_CachedPtr.offset);
+            var nativeObjectAddressPtr = managedObj.address + (uint) m_CachedPtr.offset;
+            if (
+                !m_MemoryReader.ReadPointer(nativeObjectAddressPtr).valueOut(out var nativeObjectAddress)
+            ) {
+                Debug.LogError(
+                    $"Can't read {nameof(m_CachedPtr)} from a managed object at ptr={nativeObjectAddressPtr:X}"
+                );
+                return;
+            }
             EndProfilerSample();
             // If the native object address is 0 then we have a managed object without the native side, which happens
             // when you have a leaked managed object.
@@ -659,8 +701,11 @@ namespace HeapExplorer
                 m_Snapshot.nativeObjects[nativeObjectArrayIndex].managedObjectsArrayIndex = Some(managedObj.managedObjectsArrayIndex);
 
                 // Connect the ManagedType <> NativeType
-                m_Snapshot.managedTypes[managedObj.managedTypesArrayIndex].nativeTypeArrayIndex = m_Snapshot.nativeObjects[nativeObjectArrayIndex].nativeTypesArrayIndex;
-                m_Snapshot.nativeTypes[m_Snapshot.nativeObjects[nativeObjectArrayIndex].nativeTypesArrayIndex].managedTypeArrayIndex = m_Snapshot.managedTypes[managedObj.managedTypesArrayIndex].managedTypesArrayIndex;
+                var nativeTypesArrayIndex = m_Snapshot.nativeObjects[nativeObjectArrayIndex].nativeTypesArrayIndex;
+                m_Snapshot.managedTypes[managedObj.managedTypesArrayIndex].nativeTypeArrayIndex = 
+                    Some(nativeTypesArrayIndex);
+                m_Snapshot.nativeTypes[nativeTypesArrayIndex].managedTypeArrayIndex = 
+                    Some(m_Snapshot.managedTypes[managedObj.managedTypesArrayIndex].managedTypesArrayIndex);
 
                 BeginProfilerSample("AddConnection");
                 // Add a Connection from ManagedObject to NativeObject (m_CachePtr)

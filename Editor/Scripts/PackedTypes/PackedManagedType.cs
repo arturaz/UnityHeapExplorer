@@ -5,6 +5,7 @@
 using UnityEngine;
 using System;
 using UnityEditor.Profiling.Memory.Experimental;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
@@ -49,7 +50,7 @@ namespace HeapExplorer
         /// <summary>
         /// The base type for this type, pointed to by an index into <see cref="PackedMemorySnapshot.managedTypes"/>.
         /// </summary>
-        public int baseOrElementTypeIndex;
+        public Option<int> baseOrElementTypeIndex;
 
         /// <summary>
         /// Size in bytes of an instance of this type. If this type is an array type, this describes the amount of
@@ -72,10 +73,10 @@ namespace HeapExplorer
 
         /// <summary>
         /// Index into <see cref="PackedMemorySnapshot.nativeTypes"/> if this managed type has a native counterpart or
-        /// -1 otherwise.
+        /// `None` otherwise.
         /// </summary>
         [NonSerialized]
-        public int nativeTypeArrayIndex;
+        public Option<int> nativeTypeArrayIndex;
 
         /// <summary>
         /// Number of all objects of this type.
@@ -118,7 +119,7 @@ namespace HeapExplorer
         }
 
         /// <inheritdoc/>
-        int PackedMemorySnapshot.TypeForSubclassSearch.baseTypeArrayIndex {
+        Option<int> PackedMemorySnapshot.TypeForSubclassSearch.baseTypeArrayIndex {
             get { return baseOrElementTypeIndex; }
         }
         
@@ -268,7 +269,7 @@ namespace HeapExplorer
                 if (isValueType)
                     return false;
 
-                if (baseOrElementTypeIndex == -1)
+                if (!this.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex))
                     return false;
 
                 if (baseOrElementTypeIndex == managedTypesArrayIndex)
@@ -286,7 +287,7 @@ namespace HeapExplorer
                 if (!isValueType)
                     return false;
 
-                if (baseOrElementTypeIndex == -1)
+                if (!this.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex))
                     return false;
 
                 if (baseOrElementTypeIndex == managedTypesArrayIndex)
@@ -307,8 +308,7 @@ namespace HeapExplorer
                 }
             }
 
-            field = new PackedManagedField();
-            field.managedTypesArrayIndex = -1;
+            field = default;
             return false;
         }
 
@@ -327,9 +327,9 @@ namespace HeapExplorer
                 writer.Write(value[n].name);
                 writer.Write(value[n].assembly);
 
-                writer.Write((int)value[n].staticFieldBytes.Length);
+                writer.Write(value[n].staticFieldBytes.Length);
                 writer.Write(value[n].staticFieldBytes);
-                writer.Write(value[n].baseOrElementTypeIndex);
+                writer.Write(value[n].baseOrElementTypeIndex.getOrElse(-1));
                 writer.Write(value[n].size);
                 writer.Write(value[n].typeInfoAddress);
                 writer.Write(value[n].managedTypesArrayIndex);
@@ -360,7 +360,9 @@ namespace HeapExplorer
 
                     var count = reader.ReadInt32();
                     value[n].staticFieldBytes = reader.ReadBytes(count);
-                    value[n].baseOrElementTypeIndex = reader.ReadInt32();
+                    var baseOrElementTypeIndex = reader.ReadInt32();
+                    value[n].baseOrElementTypeIndex = 
+                        baseOrElementTypeIndex == -1 ? None._ : Some(baseOrElementTypeIndex);
                     value[n].size = reader.ReadInt32();
                     value[n].typeInfoAddress = reader.ReadUInt64();
                     value[n].managedTypesArrayIndex = reader.ReadInt32();
@@ -371,8 +373,6 @@ namespace HeapExplorer
                     // https://issuetracker.unity3d.com/issues/packedmemorysnapshot-leading-period-symbol-in-typename
                     if (value[n].name != null && value[n].name.Length > 0 && value[n].name[0] == '.')
                         value[n].name = value[n].name.Substring(1);
-
-                    value[n].nativeTypeArrayIndex = -1;
                 }
             }
         }
@@ -433,8 +433,8 @@ namespace HeapExplorer
                 sourceFieldDescriptions[n].managedTypesArrayIndex = fieldTypeIndex[n];
             }
 
-            for (int n = 0, nend = value.Length; n < nend; ++n)
-            {
+            for (int n = 0, nend = value.Length; n < nend; ++n) {
+                var baseOrElementTypeIndex = sourceBaseOrElementTypeIndex[n];
                 value[n] = new PackedManagedType
                 {
                     isValueType = (sourceFlags[n] & TypeFlags.kValueType) != 0,
@@ -443,15 +443,13 @@ namespace HeapExplorer
                     name = sourceName[n],
                     assembly = sourceAssembly[n],
                     staticFieldBytes = sourceStaticFieldBytes[n],
-                    baseOrElementTypeIndex = sourceBaseOrElementTypeIndex[n],
+                    baseOrElementTypeIndex = baseOrElementTypeIndex == -1 ? None._ : Some(baseOrElementTypeIndex),
                     size = sourceSize[n],
                     typeInfoAddress = sourceTypeInfoAddress[n],
                     managedTypesArrayIndex = sourceTypeIndex[n],
-
-                    nativeTypeArrayIndex = -1,
+                    fields = new PackedManagedField[sourceFieldIndices[n].Length]
                 };
 
-                value[n].fields = new PackedManagedField[sourceFieldIndices[n].Length];
                 for (var j=0; j< sourceFieldIndices[n].Length; ++j)
                 {
                     var i = sourceFieldIndices[n][j];
@@ -488,20 +486,22 @@ namespace HeapExplorer
         public static void GetInheritanceAsString(PackedMemorySnapshot snapshot, int managedTypesArrayIndex, System.Text.StringBuilder target)
         {
             var depth = 0;
-            var loopguard = 0;
+            var loopGuard = 0;
 
-            while (managedTypesArrayIndex != -1)
-            {
+            var maybeCurrentManagedTypesArrayIndex = Some(managedTypesArrayIndex);
+            {while (maybeCurrentManagedTypesArrayIndex.valueOut(out var currentManagedTypesArrayIndex)) {
                 for (var n = 0; n < depth; ++n)
                     target.Append("  ");
 
-                target.AppendFormat("{0}\n", snapshot.managedTypes[managedTypesArrayIndex].name);
+                target.AppendFormat("{0}\n", snapshot.managedTypes[currentManagedTypesArrayIndex].name);
                 depth++;
 
-                managedTypesArrayIndex = snapshot.managedTypes[managedTypesArrayIndex].baseOrElementTypeIndex;
-                if (++loopguard > 64)
+                maybeCurrentManagedTypesArrayIndex = snapshot.managedTypes[currentManagedTypesArrayIndex].baseOrElementTypeIndex;
+                if (++loopGuard > 64) {
+                    Debug.LogError("Loop guard in `GetInheritanceAsString` kicked in.");
                     break;
-            }
+                }
+            }}
         }
 
         /// <summary>
@@ -524,10 +524,10 @@ namespace HeapExplorer
                 if (checkStatic && type.staticFields.Length > 0)
                     return true;
 
-                if (type.baseOrElementTypeIndex != -1)
-                    type = snapshot.managedTypes[type.baseOrElementTypeIndex];
+                {if (type.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex))
+                    type = snapshot.managedTypes[baseOrElementTypeIndex];}
 
-            } while (type.baseOrElementTypeIndex != -1 && type.managedTypesArrayIndex != type.baseOrElementTypeIndex);
+            } while (type.baseOrElementTypeIndex.isSome && Some(type.managedTypesArrayIndex) != type.baseOrElementTypeIndex);
 
             return false;
         }
@@ -537,10 +537,10 @@ namespace HeapExplorer
         /// </summary>
         public static bool HasTypeOrBaseAnyInstanceField(PackedMemorySnapshot snapshot, PackedManagedType type)
         {
-            var loopguard = 0;
+            var loopGuard = 0;
             do
             {
-                if (++loopguard > 64)
+                if (++loopGuard > 64)
                 {
                     Debug.LogError("loopguard kicked in");
                     break;
@@ -549,25 +549,24 @@ namespace HeapExplorer
                 if (type.instanceFields.Length > 0)
                     return true;
 
-                if (type.baseOrElementTypeIndex != -1)
-                    type = snapshot.managedTypes[type.baseOrElementTypeIndex];
+                {if (type.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex))
+                    type = snapshot.managedTypes[baseOrElementTypeIndex];}
 
-            } while (type.baseOrElementTypeIndex != -1 && type.managedTypesArrayIndex != type.baseOrElementTypeIndex);
+            } while (type.baseOrElementTypeIndex.isSome && Some(type.managedTypesArrayIndex) != type.baseOrElementTypeIndex);
 
             return false;
         }
 
         public static bool HasTypeOrBaseAnyInstanceField(PackedMemorySnapshot snapshot, PackedManagedType type, out PackedManagedType fieldType)
         {
-            fieldType = new PackedManagedType();
-            fieldType.managedTypesArrayIndex = -1;
-            fieldType.nativeTypeArrayIndex = -1;
-            fieldType.baseOrElementTypeIndex = -1;
+            fieldType = new PackedManagedType {
+                managedTypesArrayIndex = -1
+            };
 
-            var loopguard = 0;
+            var loopGuard = 0;
             do
             {
-                if (++loopguard > 64)
+                if (++loopGuard > 64)
                 {
                     Debug.LogError("loopguard kicked in");
                     break;
@@ -579,25 +578,24 @@ namespace HeapExplorer
                     return true;
                 }
 
-                if (type.baseOrElementTypeIndex != -1)
-                    type = snapshot.managedTypes[type.baseOrElementTypeIndex];
+                if (type.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex))
+                    type = snapshot.managedTypes[baseOrElementTypeIndex];
 
-            } while (type.baseOrElementTypeIndex != -1 && type.managedTypesArrayIndex != type.baseOrElementTypeIndex);
+            } while (type.baseOrElementTypeIndex.isSome && Some(type.managedTypesArrayIndex) != type.baseOrElementTypeIndex);
 
             return false;
         }
 
         public static bool HasTypeOrBaseAnyStaticField(PackedMemorySnapshot snapshot, PackedManagedType type, out PackedManagedType fieldType)
         {
-            fieldType = new PackedManagedType();
-            fieldType.managedTypesArrayIndex = -1;
-            fieldType.nativeTypeArrayIndex = -1;
-            fieldType.baseOrElementTypeIndex = -1;
+            fieldType = new PackedManagedType {
+                managedTypesArrayIndex = -1
+            };
 
-            var loopguard = 0;
+            var loopGuard = 0;
             do
             {
-                if (++loopguard > 64)
+                if (++loopGuard > 64)
                 {
                     Debug.LogError("loopguard kicked in");
                     break;
@@ -609,10 +607,10 @@ namespace HeapExplorer
                     return true;
                 }
 
-                if (type.baseOrElementTypeIndex != -1)
-                    type = snapshot.managedTypes[type.baseOrElementTypeIndex];
+                if (type.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex))
+                    type = snapshot.managedTypes[baseOrElementTypeIndex];
 
-            } while (type.baseOrElementTypeIndex != -1 && type.managedTypesArrayIndex != type.baseOrElementTypeIndex);
+            } while (type.baseOrElementTypeIndex.isSome && Some(type.managedTypesArrayIndex) != type.baseOrElementTypeIndex);
 
             return false;
         }

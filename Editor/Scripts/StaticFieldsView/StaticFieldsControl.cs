@@ -196,7 +196,10 @@ namespace HeapExplorer
                         for (int n=0, nend = list.Count; n < nend; ++n)
                         {
                             int refCount, refByCount;
-                            m_Owner.m_Snapshot.GetConnectionsCount(PackedConnection.Kind.StaticField, list[n], out refCount, out refByCount);
+                            m_Owner.m_Snapshot.GetConnectionsCount(
+                                new PackedConnection.Pair(PackedConnection.Kind.StaticField, list[n]), 
+                                out refCount, out refByCount
+                            );
 
                             m_ReferencesCount += refCount;
                         }

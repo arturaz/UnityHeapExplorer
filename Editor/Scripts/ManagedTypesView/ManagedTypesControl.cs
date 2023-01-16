@@ -90,7 +90,7 @@ namespace HeapExplorer
                 var loopGuard = 0;
                 var baseType = type;
                 var itemDepth = 1;
-                while (baseType.baseOrElementTypeIndex != -1)
+                while (baseType.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex))
                 {
                     if (++loopGuard > 128)
                     {
@@ -98,7 +98,7 @@ namespace HeapExplorer
                         break;
                     }
 
-                    baseType = m_Snapshot.managedTypes[baseType.baseOrElementTypeIndex];
+                    baseType = m_Snapshot.managedTypes[baseOrElementTypeIndex];
 
                     var baseItem = new ManagedTypeItem
                     {

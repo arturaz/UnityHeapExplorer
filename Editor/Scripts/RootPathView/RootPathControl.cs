@@ -8,32 +8,33 @@ using UnityEditor.IMGUI.Controls;
 using UnityEditor;
 using System.Linq;
 using System.Text;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
     public class ObjectProxy
     {
         public PackedMemorySnapshot snapshot;
-        public RichNativeObject? native;
-        public RichManagedObject? managed;
-        public RichGCHandle? gcHandle;
-        public RichStaticField? staticField;
+        public Option<RichNativeObject> native;
+        public Option<RichManagedObject> managed;
+        public Option<RichGCHandle> gcHandle;
+        public Option<RichStaticField> staticField;
 
         public System.Int64 id
         {
             get
             {
-                if (native.HasValue)
-                    return (1 << 62) + native.Value.packed.nativeObjectsArrayIndex;
+                if (native.isSome)
+                    return (1 << 62) + native.__unsafeGet.packed.nativeObjectsArrayIndex;
 
-                if (managed.HasValue)
-                    return (1 << 61) + managed.Value.packed.managedObjectsArrayIndex.index;
+                if (managed.isSome)
+                    return (1 << 61) + managed.__unsafeGet.packed.managedObjectsArrayIndex.index;
 
-                if (gcHandle.HasValue)
-                    return (1 << 60) + gcHandle.Value.packed.gcHandlesArrayIndex;
+                if (gcHandle.isSome)
+                    return (1 << 60) + gcHandle.__unsafeGet.packed.gcHandlesArrayIndex;
 
-                if (staticField.HasValue)
-                    return (1 << 59) + staticField.Value.packed.staticFieldsArrayIndex;
+                if (staticField.isSome)
+                    return (1 << 59) + staticField.__unsafeGet.packed.staticFieldsArrayIndex;
 
                 return 0;
             }
@@ -42,40 +43,40 @@ namespace HeapExplorer
         public ObjectProxy(PackedMemorySnapshot snp, PackedNativeUnityEngineObject packed)
         {
             snapshot = snp;
-            native = new RichNativeObject(snp, packed.nativeObjectsArrayIndex);
+            native = Some(new RichNativeObject(snp, packed.nativeObjectsArrayIndex));
         }
 
         public ObjectProxy(PackedMemorySnapshot snp, PackedManagedObject packed)
         {
             snapshot = snp;
-            managed = new RichManagedObject(snp, packed.managedObjectsArrayIndex);
+            managed = Some(new RichManagedObject(snp, packed.managedObjectsArrayIndex));
         }
 
         public ObjectProxy(PackedMemorySnapshot snp, PackedGCHandle packed)
         {
             snapshot = snp;
-            gcHandle = new RichGCHandle(snp, packed.gcHandlesArrayIndex);
+            gcHandle = Some(new RichGCHandle(snp, packed.gcHandlesArrayIndex));
         }
 
         public ObjectProxy(PackedMemorySnapshot snp, PackedManagedStaticField packed)
         {
             snapshot = snp;
-            staticField = new RichStaticField(snp, packed.staticFieldsArrayIndex);
+            staticField = Some(new RichStaticField(snp, packed.staticFieldsArrayIndex));
         }
 
         public override string ToString()
         {
-            if (native.HasValue)
-                return $"Native, {native.Value}";
+            if (native.isSome)
+                return $"Native, {native.__unsafeGet}";
 
-            if (managed.HasValue)
-                return $"Managed, {managed.Value}";
+            if (managed.isSome)
+                return $"Managed, {managed.__unsafeGet}";
 
-            if (gcHandle.HasValue)
-                return $"GCHandle, {gcHandle.Value}";
+            if (gcHandle.isSome)
+                return $"GCHandle, {gcHandle.__unsafeGet}";
 
-            if (staticField.HasValue)
-                return $"StaticField, {staticField.Value}";
+            if (staticField.isSome)
+                return $"StaticField, {staticField.__unsafeGet}";
 
             return base.ToString();
         }
@@ -308,61 +309,61 @@ namespace HeapExplorer
                 Debug.LogWarningFormat("{0} issues have been detected while finding root-paths. This is most likely related to an earlier bug in Heap Explorer, that started to occur with Unity 2019.3 and causes that (some) object connections are invalid. Please capture a new memory snapshot.", issues);
         }
 
-        List<ObjectProxy> GetReferencedBy(ObjectProxy obj, ref int issues)
+        static List<ObjectProxy> GetReferencedBy(ObjectProxy obj, ref int issues)
         {
             var referencedBy = new List<PackedConnection>(32);
 
-            if (obj.staticField.HasValue)
-                obj.snapshot.GetConnections(obj.staticField.Value.packed, null, referencedBy);
+            {if (obj.staticField.valueOut(out var staticField))
+                obj.snapshot.GetConnections(staticField.packed, null, referencedBy);}
 
-            if (obj.native.HasValue)
-                obj.snapshot.GetConnections(obj.native.Value.packed, null, referencedBy);
+            {if (obj.native.valueOut(out var nativeObject))
+                obj.snapshot.GetConnections(nativeObject.packed, null, referencedBy);}
 
-            if (obj.managed.HasValue)
-                obj.snapshot.GetConnections(obj.managed.Value.packed, null, referencedBy);
+            {if (obj.managed.valueOut(out var managedObject))
+                obj.snapshot.GetConnections(managedObject.packed, null, referencedBy);}
 
-            if (obj.gcHandle.HasValue)
-                obj.snapshot.GetConnections(obj.gcHandle.Value.packed, null, referencedBy);
+            if (obj.gcHandle.isSome)
+                obj.snapshot.GetConnections(obj.gcHandle.__unsafeGet.packed, null, referencedBy);
 
             var value = new List<ObjectProxy>(referencedBy.Count);
             foreach (var c in referencedBy)
             {
-                switch (c.fromKind)
+                switch (c.from.kind)
                 {
                     case PackedConnection.Kind.Native:
-                        if (c.from < 0 || c.from >= obj.snapshot.nativeObjects.Length)
+                        if (c.from.index < 0 || c.from.index >= obj.snapshot.nativeObjects.Length)
                         {
                             issues++;
                             continue;
                         }
-                        value.Add(new ObjectProxy(obj.snapshot, obj.snapshot.nativeObjects[c.from]));
+                        value.Add(new ObjectProxy(obj.snapshot, obj.snapshot.nativeObjects[c.from.index]));
                         break;
 
                     case PackedConnection.Kind.Managed:
-                        if (c.from < 0 || c.from >= obj.snapshot.managedObjects.Length)
+                        if (c.from.index < 0 || c.from.index >= obj.snapshot.managedObjects.Length)
                         {
                             issues++;
                             continue;
                         }
-                        value.Add(new ObjectProxy(obj.snapshot, obj.snapshot.managedObjects[c.from]));
+                        value.Add(new ObjectProxy(obj.snapshot, obj.snapshot.managedObjects[c.from.index]));
                         break;
 
                     case PackedConnection.Kind.GCHandle:
-                        if (c.from < 0 || c.from >= obj.snapshot.gcHandles.Length)
+                        if (c.from.index < 0 || c.from.index >= obj.snapshot.gcHandles.Length)
                         {
                             issues++;
                             continue;
                         }
-                        value.Add(new ObjectProxy(obj.snapshot, obj.snapshot.gcHandles[c.from]));
+                        value.Add(new ObjectProxy(obj.snapshot, obj.snapshot.gcHandles[c.from.index]));
                         break;
 
                     case PackedConnection.Kind.StaticField:
-                        if (c.from < 0 || c.from >= obj.snapshot.managedStaticFields.Length)
+                        if (c.from.index < 0 || c.from.index >= obj.snapshot.managedStaticFields.Length)
                         {
                             issues++;
                             continue;
                         }
-                        value.Add(new ObjectProxy(obj.snapshot, obj.snapshot.managedStaticFields[c.from]));
+                        value.Add(new ObjectProxy(obj.snapshot, obj.snapshot.managedStaticFields[c.from.index]));
                         break;
                 }
             }
@@ -374,26 +375,24 @@ namespace HeapExplorer
         {
             reason = RootPathReason.None;
 
-            if (thing.staticField.HasValue)
+            if (thing.staticField.isSome)
             {
                 reason = RootPathReason.Static;
                 return true;
             }
 
-            if (thing.managed.HasValue)
+            if (thing.managed.isSome)
             {
                 return false;
             }
 
-            if (thing.gcHandle.HasValue)
+            if (thing.gcHandle.isSome)
             {
                 return false;
             }
 
-            if (!thing.native.HasValue)
+            if (!thing.native.valueOut(out var native))
                 throw new System.ArgumentException("Unknown type: " + thing.GetType());
-
-            var native = thing.native.Value;
 
             if (native.isManager)
             {
@@ -524,14 +523,14 @@ namespace HeapExplorer
                     var obj = path[n];
                     Item newItem = null;
 
-                    if (obj.native.HasValue)
-                        newItem = AddNativeUnityObject(parent, obj.native.Value.packed);
-                    else if (obj.managed.HasValue)
-                        newItem = AddManagedObject(parent, obj.managed.Value.packed);
-                    else if (obj.gcHandle.HasValue)
-                        newItem = AddGCHandle(parent, obj.gcHandle.Value.packed);
-                    else if (obj.staticField.HasValue)
-                        newItem = AddStaticField(parent, obj.staticField.Value.packed);
+                    if (obj.native.isSome)
+                        newItem = AddNativeUnityObject(parent, obj.native.__unsafeGet.packed);
+                    else if (obj.managed.isSome)
+                        newItem = AddManagedObject(parent, obj.managed.__unsafeGet.packed);
+                    else if (obj.gcHandle.isSome)
+                        newItem = AddGCHandle(parent, obj.gcHandle.__unsafeGet.packed);
+                    else if (obj.staticField.isSome)
+                        newItem = AddStaticField(parent, obj.staticField.__unsafeGet.packed);
 
                     if (parent == root)
                     {
@@ -693,7 +692,7 @@ namespace HeapExplorer
                 m_GCHandle = new RichGCHandle(m_Snapshot, gcHandleArrayIndex);
 
                 displayName = "GCHandle";
-                m_Value = m_GCHandle.managedObject.HasValue ? m_GCHandle.managedObject.Value.type.name : "";
+                m_Value = m_GCHandle.managedObject.fold("", _ => _.type.name);
                 m_Address = m_GCHandle.managedObjectAddress;
             }
 
@@ -706,21 +705,19 @@ namespace HeapExplorer
                         m_Owner.window.OnGoto(new GotoCommand(m_GCHandle));
                     }
 
-                    if (m_GCHandle.nativeObject.HasValue)
-                    {
+                    {if (m_GCHandle.nativeObject.valueOut(out var nativeObject)) {
                         if (HeEditorGUI.CppButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_GCHandle.nativeObject.Value));
+                            m_Owner.window.OnGoto(new GotoCommand(nativeObject));
                         }
-                    }
+                    }}
 
-                    if (m_GCHandle.managedObject.HasValue)
-                    {
+                    {if (m_GCHandle.managedObject.valueOut(out var managedObject)) {
                         if (HeEditorGUI.CsButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_GCHandle.managedObject.Value));
+                            m_Owner.window.OnGoto(new GotoCommand(managedObject));
                         }
-                    }
+                    }}
                 }
 
                 base.OnGUI(position, column);
@@ -742,7 +739,7 @@ namespace HeapExplorer
 
                 displayName = m_ManagedObject.type.name;
                 m_Address = m_ManagedObject.address;
-                m_Value = m_ManagedObject.nativeObject.HasValue ? m_ManagedObject.nativeObject.Value.name : "";
+                m_Value = m_ManagedObject.nativeObject.fold("", _ => _.name);
             }
 
             public override void OnGUI(Rect position, int column)
@@ -754,21 +751,19 @@ namespace HeapExplorer
                         m_Owner.window.OnGoto(new GotoCommand(m_ManagedObject));
                     }
 
-                    if (m_ManagedObject.gcHandle.HasValue)
-                    {
+                    {if (m_ManagedObject.gcHandle.valueOut(out var gcHandle)) {
                         if (HeEditorGUI.GCHandleButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_ManagedObject.gcHandle.Value));
+                            m_Owner.window.OnGoto(new GotoCommand(gcHandle));
                         }
-                    }
+                    }}
 
-                    if (m_ManagedObject.nativeObject.HasValue)
-                    {
+                    {if (m_ManagedObject.nativeObject.valueOut(out var nativeObject)) {
                         if (HeEditorGUI.CppButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_ManagedObject.nativeObject.Value));
+                            m_Owner.window.OnGoto(new GotoCommand(nativeObject));
                         }
-                    }
+                    }}
                 }
 
                 base.OnGUI(position, column);
@@ -832,11 +827,10 @@ namespace HeapExplorer
                 // TODO: Move to separate method
                 if (m_NativeObject.type.IsSubclassOf(m_Snapshot.coreTypes.nativeMonoBehaviour) || m_NativeObject.type.IsSubclassOf(m_Snapshot.coreTypes.nativeScriptableObject))
                 {
-                    string monoScriptName;
-                    if (m_Snapshot.FindNativeMonoScriptType(m_NativeObject.packed.nativeObjectsArrayIndex, out monoScriptName) != -1)
+                    if (m_Snapshot.FindNativeMonoScriptType(m_NativeObject.packed.nativeObjectsArrayIndex).valueOut(out var tpl))
                     {
-                        if (!string.IsNullOrEmpty(monoScriptName))
-                            displayName = monoScriptName;
+                        if (!string.IsNullOrEmpty(tpl.monoScriptName))
+                            displayName = tpl.monoScriptName;
                     }
                 }
             }
@@ -850,21 +844,19 @@ namespace HeapExplorer
                         m_Owner.window.OnGoto(new GotoCommand(m_NativeObject));
                     }
 
-                    if (m_NativeObject.gcHandle.HasValue)
-                    {
+                    {if (m_NativeObject.gcHandle.valueOut(out var gcHandle)) {
                         if (HeEditorGUI.GCHandleButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_NativeObject.gcHandle.Value));
+                            m_Owner.window.OnGoto(new GotoCommand(gcHandle));
                         }
-                    }
+                    }}
 
-                    if (m_NativeObject.managedObject.HasValue)
-                    {
+                    {if (m_NativeObject.managedObject.valueOut(out var managedObject)) {
                         if (HeEditorGUI.CsButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_NativeObject.managedObject.Value));
+                            m_Owner.window.OnGoto(new GotoCommand(managedObject));
                         }
-                    }
+                    }}
                 }
 
                 base.OnGUI(position, column);

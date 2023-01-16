@@ -308,17 +308,7 @@ namespace HeapExplorer
                 }
             }
 
-            public override string cppName
-            {
-                get
-                {
-                    var nativeObj = m_Object.nativeObject;
-                    if (nativeObj.HasValue)
-                        return nativeObj.name;
-
-                    return "";
-                }
-            }
+            public override string cppName => m_Object.nativeObject.valueOut(out var nativeObj) ? nativeObj.name : "";
 
             public override long size
             {
@@ -378,11 +368,11 @@ namespace HeapExplorer
                     //    }
                     //}
 
-                    if (m_Object.nativeObject.HasValue)
+                    if (m_Object.nativeObject.valueOut(out var nativeObject))
                     {
                         if (HeEditorGUI.CppButton(HeEditorGUI.SpaceR(ref position, position.height)))
                         {
-                            m_Owner.window.OnGoto(new GotoCommand(m_Object.nativeObject));
+                            m_Owner.window.OnGoto(new GotoCommand(nativeObject));
                         }
                     }
                 }
@@ -394,8 +384,8 @@ namespace HeapExplorer
                         break;
 
                     case Column.CppCounterpart:
-                        if (m_Object.nativeObject.HasValue)
-                            GUI.Label(position, m_Object.nativeObject.name);
+                        if (m_Object.nativeObject.valueOut(out var nativeObject))
+                            GUI.Label(position, nativeObject.name);
                         break;
 
                     case Column.Size:

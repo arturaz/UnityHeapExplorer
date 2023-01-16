@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
@@ -57,8 +58,7 @@ namespace HeapExplorer
             var reader = new MemoryReader(m_Snapshot);
             var systemDelegate = m_Snapshot.managedTypes[m_Snapshot.coreTypes.systemDelegate];
 
-            PackedManagedField field;
-            if (!systemDelegate.TryGetField("m_target", out field))
+            if (!systemDelegate.TryGetField("m_target", out var field))
                 return;
 
             // Build a table that contains indices of all objects that are the "Target" of a delegate
@@ -77,7 +77,11 @@ namespace HeapExplorer
                     continue;
 
                 // Read the delegate m_target pointer
-                var pointer = reader.ReadPointer(obj.address + (uint)field.offset);
+                var m_targetPtr = obj.address + (uint) field.offset;
+                if (!reader.ReadPointer(obj.address + (uint) field.offset).valueOut(out var pointer)) {
+                    Debug.LogError($"Can't read 'm_target' pointer from address {m_targetPtr:X}");
+                    continue;
+                }
                 if (pointer == 0)
                     continue;
 
@@ -163,7 +167,7 @@ namespace HeapExplorer
 
         public override int CanProcessCommand(GotoCommand command)
         {
-            if (command.toManagedObject.HasValue)
+            if (command.toManagedObject.isSome)
                 return 10;
 
             return base.CanProcessCommand(command);
@@ -202,7 +206,7 @@ namespace HeapExplorer
 
         HeSearchField m_ObjectsSearchField;
         ConnectionsView m_ConnectionsView;
-        RichManagedObject? m_Selected;
+        Option<RichManagedObject> m_Selected;
         RootPathView m_RootPathView;
         PropertyGridView m_PropertyGridView;
         float m_SplitterHorzPropertyGrid = 0.32f;
@@ -275,7 +279,7 @@ namespace HeapExplorer
 
         void OnListViewSelectionChange(PackedManagedObject? item)
         {
-            m_Selected = null;
+            m_Selected = None._;
             if (!item.HasValue)
             {
                 m_RootPathView.Clear();
@@ -285,7 +289,7 @@ namespace HeapExplorer
             }
 
             var selected = new RichManagedObject(snapshot, item.Value.managedObjectsArrayIndex);
-            m_Selected = selected;
+            m_Selected = Some(selected);
             m_ConnectionsView.Inspect(selected.packed);
             m_PropertyGridView.Inspect(selected.packed);
             m_RootPathView.Inspect(selected.packed);

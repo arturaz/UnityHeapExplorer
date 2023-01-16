@@ -2,11 +2,11 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor.IMGUI.Controls;
 using UnityEditor;
+using static HeapExplorer.Option;
 
 namespace HeapExplorer
 {
@@ -70,7 +70,7 @@ namespace HeapExplorer
             var job = new Job
             {
                 snapshot = snapshot,
-                memorySection = item,
+                memorySection = Some(item),
                 referencedByControl = m_ReferencedByControl,
                 referencesControl = m_ReferencesControl
             };
@@ -106,7 +106,7 @@ namespace HeapExplorer
             var job = new Job
             {
                 snapshot = snapshot,
-                staticFields = items,
+                staticFields = Some(items),
                 referencedByControl = m_ReferencedByControl,
                 referencesControl = m_ReferencesControl
             };
@@ -213,7 +213,7 @@ namespace HeapExplorer
             var job = new Job
             {
                 snapshot = snapshot,
-                objectProxy = objectProxy,
+                objectProxy = Some(objectProxy),
                 referencedByControl = m_ReferencedByControl,
                 referencesControl = m_ReferencesControl
             };
@@ -223,9 +223,9 @@ namespace HeapExplorer
 
         class Job : AbstractThreadJob
         {
-            public ObjectProxy objectProxy;
-            public PackedManagedStaticField[] staticFields;
-            public PackedMemorySection? memorySection;
+            public Option<ObjectProxy> objectProxy;
+            public Option<PackedManagedStaticField[]> staticFields;
+            public Option<PackedMemorySection> memorySection;
 
             public PackedMemorySnapshot snapshot;
             public ConnectionsControl referencesControl;
@@ -238,32 +238,44 @@ namespace HeapExplorer
 
             public override void ThreadFunc()
             {
-                var references = new List<PackedConnection>();
-                var referencedBy = new List<PackedConnection>();
+                // The `.to` endpoints of `PackedConnection`.
+                var references = new List<PackedConnection.Pair>();
+                PackedConnection.Pair convertReferences(PackedConnection connection) => connection.to;
+                // The `.from` endpoints of `PackedConnection`.
+                var referencedBy = new List<PackedConnection.Pair>();
+                PackedConnection.Pair convertReferencedBy(PackedConnection connection) => connection.from;
 
-                if (objectProxy != null && objectProxy.gcHandle.HasValue)
-                    snapshot.GetConnections(objectProxy.gcHandle.Value.packed, references, referencedBy);
+                {if (this.objectProxy.valueOut(out var objectProxy) && objectProxy.gcHandle.valueOut(out var gcHandle))
+                    snapshot.GetConnections(
+                        gcHandle.packed, references, referencedBy, convertReferences, convertReferencedBy
+                    );}
 
-                if (objectProxy != null && objectProxy.managed.HasValue)
-                    snapshot.GetConnections(objectProxy.managed.Value.packed, references, referencedBy);
+                {if (this.objectProxy.valueOut(out var objectProxy) && objectProxy.managed.valueOut(out var managedObject))
+                    snapshot.GetConnections(
+                        managedObject.packed, references, referencedBy, convertReferences, convertReferencedBy
+                    );}
 
-                if (objectProxy != null && objectProxy.native.HasValue)
-                    snapshot.GetConnections(objectProxy.native.Value.packed, references, referencedBy);
+                {if (this.objectProxy.valueOut(out var objectProxy) && objectProxy.native.valueOut(out var nativeObject))
+                    snapshot.GetConnections(
+                        nativeObject.packed, references, referencedBy, convertReferences, convertReferencedBy
+                    );}
 
-                if (objectProxy != null && objectProxy.staticField.HasValue)
-                    snapshot.GetConnections(objectProxy.staticField.Value.packed, references, referencedBy);
+                {if (this.objectProxy.valueOut(out var objectProxy) && objectProxy.staticField.valueOut(out var staticField))
+                    snapshot.GetConnections(
+                        staticField.packed, references, referencedBy, convertReferences, convertReferencedBy
+                    );}
 
-                if (memorySection.HasValue)
-                    snapshot.GetConnections(memorySection.Value, references, referencedBy);
+                {if (this.memorySection.valueOut(out var memorySection)) {
+                    snapshot.GetConnections(memorySection, references, _ => _);
+                }}
 
-                if (staticFields != null)
-                {
+                {if (this.staticFields.valueOut(out var staticFields)) {
                     foreach (var item in staticFields)
-                        snapshot.GetConnections(item, references, referencedBy);
-                }
+                        snapshot.GetConnections(item, references, referencedBy, convertReferences, convertReferencedBy);
+                }}
 
-                referencesTree = referencesControl.BuildTree(snapshot, references.ToArray(), false, true);
-                referencedByTree = referencedByControl.BuildTree(snapshot, referencedBy.ToArray(), true, false);
+                referencesTree = referencesControl.BuildTree(snapshot, references.ToArray());
+                referencedByTree = referencedByControl.BuildTree(snapshot, referencedBy.ToArray());
             }
 
             public override void IntegrateFunc()

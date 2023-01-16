@@ -6,6 +6,12 @@ using static HeapExplorer.Option;
 
 namespace HeapExplorer {
   public static class Utils {
+    public static Option<A> zeroAddressAccessError<A>(string paramName) {
+      // throw new ArgumentOutOfRangeException(paramName, 0, "address 0 should not be accessed!");
+      Debug.LogError("address 0 should not be accessed!");
+      return new Option<A>();
+    }
+
     /// <summary>
     /// Returns the <see cref="ulong"/> value as <see cref="long"/>, clamping it if it doesn't fit. 
     /// </summary>

@@ -129,7 +129,7 @@ namespace HeapExplorer
                     try
                     {
                         PackedMemorySnapshotHeader.Read(reader, out header, out busyString);
-                        if (!header.HasValue)
+                        if (!header.isValid)
                             throw new Exception("Invalid header.");
 
                         PackedNativeType.Read(reader, out nativeTypes, out busyString);

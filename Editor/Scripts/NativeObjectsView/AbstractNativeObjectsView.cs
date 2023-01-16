@@ -163,9 +163,9 @@ namespace HeapExplorer
 
         public override void RestoreCommand(GotoCommand command)
         {
-            if (command.toNativeObject.HasValue)
+            if (command.toNativeObject.valueOut(out var nativeObject))
             {
-                m_NativeObjectsControl.Select(command.toNativeObject.packed);
+                m_NativeObjectsControl.Select(nativeObject.packed);
                 return;
             }
 
