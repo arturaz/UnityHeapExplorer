@@ -7,6 +7,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEditor.IMGUI.Controls;
 using UnityEditor;
+using static HeapExplorer.ViewConsts;
 
 namespace HeapExplorer
 {
@@ -56,7 +57,7 @@ namespace HeapExplorer
                 new MultiColumnHeaderState(new[]
                 {
                 new MultiColumnHeaderState.Column() { headerContent = new GUIContent("C# Type"), width = 250, autoResize = true },
-                new MultiColumnHeaderState.Column() { headerContent = new GUIContent("C++ Name", "If the C# object has a C++ counterpart, display its C++ object name in this column."), width = 150, autoResize = true },
+                new MultiColumnHeaderState.Column() { headerContent = new GUIContent(COLUMN_CPP_NAME, COLUMN_CPP_NAME_DESCRIPTION), width = 150, autoResize = true },
                 new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Size"), width = 80, autoResize = true },
                 new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Count"), width = 80, autoResize = true },
                 new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Address"), width = 120, autoResize = true },

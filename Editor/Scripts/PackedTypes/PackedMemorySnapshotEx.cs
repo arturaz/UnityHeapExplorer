@@ -4,10 +4,8 @@
 //
 
 //#define ENABLE_PROFILING
-using System.Collections;
 using System.Collections.Generic;
 using UnityEngine;
-using UnityEditor;
 using System;
 using System.Linq;
 using System.Threading;
@@ -317,10 +315,10 @@ namespace HeapExplorer
         /// <summary>
         /// Add a connection between two objects, such as a connection from a native object to its managed counter-part.
         /// </summary>
-        public void AddConnection(PackedConnection.Pair from, PackedConnection.Pair to) {
+        public void AddConnection(PackedConnection.From from, PackedConnection.Pair to) {
             var connection = new PackedConnection(from, to);
 
-            addTo(from.ComputeConnectionKey(), m_ConnectionsFrom);
+            addTo(from.pair.ComputeConnectionKey(), m_ConnectionsFrom);
             addTo(to.ComputeConnectionKey(), m_ConnectionsTo);
 
             void addTo<K>(K key, Dictionary<K, List<PackedConnection>> dict) {
@@ -657,11 +655,13 @@ namespace HeapExplorer
 
                 var connection = connections[n];
 
-                var newFrom =
-                    connection.from.index >= nativeStart && connection.from.index < nativeEnd
-                        ? new PackedConnection.Pair(PackedConnection.Kind.Native, connection.from.index - nativeStart)
-                        : new PackedConnection.Pair(PackedConnection.Kind.GCHandle, connection.from.index);
-
+                // Remap the indexes.
+                var newFrom = new PackedConnection.From(
+                    connection.from.pair.index >= nativeStart && connection.from.pair.index < nativeEnd
+                        ? new PackedConnection.Pair(PackedConnection.Kind.Native, connection.from.pair.index - nativeStart)
+                        : new PackedConnection.Pair(PackedConnection.Kind.GCHandle, connection.from.pair.index),
+                    connection.from.field
+                );
                 var newTo =
                     connection.to.index >= nativeStart && connection.to.index < nativeEnd
                         ? new PackedConnection.Pair(PackedConnection.Kind.Native, connection.to.index - nativeStart)

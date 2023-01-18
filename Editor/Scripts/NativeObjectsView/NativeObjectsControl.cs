@@ -13,12 +13,13 @@ using UnityEditor;
 using System.Reflection;
 using System.Threading;
 using HeapExplorer.Utilities;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {
     public class NativeObjectsControl : AbstractTreeView
     {
-        public System.Action<PackedNativeUnityEngineObject?> onSelectionChange;
+        public System.Action<Option<PackedNativeUnityEngineObject>> onSelectionChange;
 
         public long nativeObjectsCount
         {
@@ -122,11 +123,11 @@ namespace HeapExplorer
             var item = selectedItem as NativeObjectItem;
             if (item == null)
             {
-                onSelectionChange.Invoke(null);
+                onSelectionChange.Invoke(None._);
                 return;
             }
 
-            onSelectionChange.Invoke(item.packed);
+            onSelectionChange.Invoke(Some(item.packed));
         }
 
         public struct BuildArgs

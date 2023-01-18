@@ -3,6 +3,7 @@
 // https://github.com/pschraut/UnityHeapExplorer/
 //
 using System.Collections.Generic;
+using System.Linq;
 using HeapExplorer.Utilities;
 using UnityEngine;
 using UnityEditor.IMGUI.Controls;
@@ -81,22 +82,26 @@ namespace HeapExplorer
 
         public void Inspect(PackedNativeUnityEngineObject item)
         {
-            ScheduleJob(new ObjectProxy(snapshot, item));
+            // TODO: add `sourceField` data
+            ScheduleJob(new ObjectProxy(snapshot, item, sourceField: None._));
         }
 
         public void Inspect(PackedManagedStaticField item)
         {
-            ScheduleJob(new ObjectProxy(snapshot, item));
+            // TODO: add `sourceField` data
+            ScheduleJob(new ObjectProxy(snapshot, item, sourceField: None._));
         }
 
         public void Inspect(PackedGCHandle item)
         {
-            ScheduleJob(new ObjectProxy(snapshot, item));
+            // TODO: add `sourceField` data
+            ScheduleJob(new ObjectProxy(snapshot, item, sourceField: None._));
         }
 
         public void Inspect(PackedManagedObject item)
         {
-            ScheduleJob(new ObjectProxy(snapshot, item));
+            // TODO: add `sourceField` data
+            ScheduleJob(new ObjectProxy(snapshot, item, sourceField: None._));
         }
 
         public void Inspect(PackedManagedStaticField[] items)
@@ -243,8 +248,8 @@ namespace HeapExplorer
                 var references = new List<PackedConnection.Pair>();
                 PackedConnection.Pair convertReferences(PackedConnection connection) => connection.to;
                 // The `.from` endpoints of `PackedConnection`.
-                var referencedBy = new List<PackedConnection.Pair>();
-                PackedConnection.Pair convertReferencedBy(PackedConnection connection) => connection.from;
+                var referencedBy = new List<PackedConnection.From>();
+                PackedConnection.From convertReferencedBy(PackedConnection connection) => connection.from;
 
                 {if (this.objectProxy.valueOut(out var objectProxy) && objectProxy.gcHandle.valueOut(out var gcHandle))
                     snapshot.GetConnections(
@@ -275,7 +280,11 @@ namespace HeapExplorer
                         snapshot.GetConnections(item, references, referencedBy, convertReferences, convertReferencedBy);
                 }}
 
-                referencesTree = referencesControl.BuildTree(snapshot, references.ToArray());
+                referencesTree = referencesControl.BuildTree(
+                    snapshot, 
+                    // See method documentation for reasoning.
+                    references.Select(to => new PackedConnection.From(to, field: None._)).ToArray()
+                );
                 referencedByTree = referencedByControl.BuildTree(snapshot, referencedBy.ToArray());
             }
 

@@ -10,16 +10,20 @@ using System.Linq;
 using System.Text;
 using HeapExplorer.Utilities;
 using static HeapExplorer.Utilities.Option;
+using static HeapExplorer.ViewConsts;
 
 namespace HeapExplorer
 {
     public class ObjectProxy
     {
-        public PackedMemorySnapshot snapshot;
-        public Option<RichNativeObject> native;
-        public Option<RichManagedObject> managed;
-        public Option<RichGCHandle> gcHandle;
-        public Option<RichStaticField> staticField;
+        public readonly PackedMemorySnapshot snapshot;
+        public readonly Option<RichNativeObject> native;
+        public readonly Option<RichManagedObject> managed;
+        public readonly Option<RichGCHandle> gcHandle;
+        public readonly Option<RichStaticField> staticField;
+        
+        /// <summary>Field in the source object that points to this object, if available.</summary>
+        public readonly Option<PackedManagedField> sourceField;
 
         public System.Int64 id
         {
@@ -41,43 +45,50 @@ namespace HeapExplorer
             }
         }
 
-        public ObjectProxy(PackedMemorySnapshot snp, PackedNativeUnityEngineObject packed)
+        public ObjectProxy(PackedMemorySnapshot snp, PackedNativeUnityEngineObject packed, Option<PackedManagedField> sourceField)
         {
             snapshot = snp;
             native = Some(new RichNativeObject(snp, packed.nativeObjectsArrayIndex));
+            this.sourceField = sourceField;
         }
 
-        public ObjectProxy(PackedMemorySnapshot snp, PackedManagedObject packed)
+        public ObjectProxy(PackedMemorySnapshot snp, PackedManagedObject packed, Option<PackedManagedField> sourceField)
         {
             snapshot = snp;
             managed = Some(new RichManagedObject(snp, packed.managedObjectsArrayIndex));
+            this.sourceField = sourceField;
         }
 
-        public ObjectProxy(PackedMemorySnapshot snp, PackedGCHandle packed)
+        public ObjectProxy(PackedMemorySnapshot snp, PackedGCHandle packed, Option<PackedManagedField> sourceField)
         {
             snapshot = snp;
             gcHandle = Some(new RichGCHandle(snp, packed.gcHandlesArrayIndex));
+            this.sourceField = sourceField;
         }
 
-        public ObjectProxy(PackedMemorySnapshot snp, PackedManagedStaticField packed)
+        public ObjectProxy(PackedMemorySnapshot snp, PackedManagedStaticField packed, Option<PackedManagedField> sourceField)
         {
             snapshot = snp;
             staticField = Some(new RichStaticField(snp, packed.staticFieldsArrayIndex));
+            this.sourceField = sourceField;
         }
 
-        public override string ToString()
-        {
+        public override string ToString() {
+            var fieldStr = sourceField.fold(
+                snapshot, "", (f, snapshot) => 
+                    $"\nSource Field: '{f.name}' of type '{snapshot.managedTypes[f.managedTypesArrayIndex].name}'"
+            );
             if (native.isSome)
-                return $"Native, {native.__unsafeGet}";
+                return $"Native, {native.__unsafeGet}{fieldStr}";
 
             if (managed.isSome)
-                return $"Managed, {managed.__unsafeGet}";
+                return $"Managed, {managed.__unsafeGet}{fieldStr}";
 
             if (gcHandle.isSome)
-                return $"GCHandle, {gcHandle.__unsafeGet}";
+                return $"GCHandle, {gcHandle.__unsafeGet}{fieldStr}";
 
             if (staticField.isSome)
-                return $"StaticField, {staticField.__unsafeGet}";
+                return $"StaticField, {staticField.__unsafeGet}{fieldStr}";
 
             return base.ToString();
         }
@@ -102,26 +113,15 @@ namespace HeapExplorer
 
     public class RootPath : System.IComparable<RootPath>
     {
-        public int count
-        {
-            get
-            {
-                return m_Items.Length;
-            }
-        }
+        public int count => m_Items.Length;
 
-        public RootPathReason reason
-        {
-            get;
-            private set;
-        }
+        public readonly RootPathReason reason;
 
         public string reasonString
         {
             get
             {
-                switch(reason)
-                {
+                switch(reason) {
                     case RootPathReason.None:
                         return "";
                     case RootPathReason.AssetBundle:
@@ -140,9 +140,9 @@ namespace HeapExplorer
                         return "Static fields are global variables. Anything they reference will not be unloaded.";
                     case RootPathReason.Unknown:
                         return "This object is a root, but the memory profiler UI does not yet understand why";
+                    default:
+                        return "???";
                 }
-
-                return "???";
             }
         }
 
@@ -153,13 +153,7 @@ namespace HeapExplorer
             this.m_Items = path;
         }
 
-        public ObjectProxy this[int index]
-        {
-            get
-            {
-                return m_Items[index];
-            }
-        }
+        public ObjectProxy this[int index] => m_Items[index];
 
         public int CompareTo(RootPath other)
         {
@@ -323,48 +317,53 @@ namespace HeapExplorer
             {if (obj.managed.valueOut(out var managedObject))
                 obj.snapshot.GetConnections(managedObject.packed, null, referencedBy);}
 
-            if (obj.gcHandle.isSome)
-                obj.snapshot.GetConnections(obj.gcHandle.__unsafeGet.packed, null, referencedBy);
+            {if (obj.gcHandle.valueOut(out var gcHandle))
+                obj.snapshot.GetConnections(gcHandle.packed, null, referencedBy);}
 
             var value = new List<ObjectProxy>(referencedBy.Count);
-            foreach (var c in referencedBy)
-            {
-                switch (c.from.kind)
-                {
+            foreach (var c in referencedBy) {
+                switch (c.from.pair.kind) {
                     case PackedConnection.Kind.Native:
-                        if (c.from.index < 0 || c.from.index >= obj.snapshot.nativeObjects.Length)
-                        {
+                        if (c.from.pair.index < 0 || c.from.pair.index >= obj.snapshot.nativeObjects.Length) {
                             issues++;
                             continue;
                         }
-                        value.Add(new ObjectProxy(obj.snapshot, obj.snapshot.nativeObjects[c.from.index]));
+                        value.Add(new ObjectProxy(
+                            obj.snapshot, obj.snapshot.nativeObjects[c.from.pair.index], c.from.field
+                        ));
                         break;
 
                     case PackedConnection.Kind.Managed:
-                        if (c.from.index < 0 || c.from.index >= obj.snapshot.managedObjects.Length)
+                        if (c.from.pair.index < 0 || c.from.pair.index >= obj.snapshot.managedObjects.Length)
                         {
                             issues++;
                             continue;
                         }
-                        value.Add(new ObjectProxy(obj.snapshot, obj.snapshot.managedObjects[c.from.index]));
+                        value.Add(new ObjectProxy(
+                            obj.snapshot, obj.snapshot.managedObjects[c.from.pair.index], c.from.field
+                        ));
                         break;
 
                     case PackedConnection.Kind.GCHandle:
-                        if (c.from.index < 0 || c.from.index >= obj.snapshot.gcHandles.Length)
+                        if (c.from.pair.index < 0 || c.from.pair.index >= obj.snapshot.gcHandles.Length)
                         {
                             issues++;
                             continue;
                         }
-                        value.Add(new ObjectProxy(obj.snapshot, obj.snapshot.gcHandles[c.from.index]));
+                        value.Add(new ObjectProxy(
+                            obj.snapshot, obj.snapshot.gcHandles[c.from.pair.index], c.from.field
+                        ));
                         break;
 
                     case PackedConnection.Kind.StaticField:
-                        if (c.from.index < 0 || c.from.index >= obj.snapshot.managedStaticFields.Length)
+                        if (c.from.pair.index < 0 || c.from.pair.index >= obj.snapshot.managedStaticFields.Length)
                         {
                             issues++;
                             continue;
                         }
-                        value.Add(new ObjectProxy(obj.snapshot, obj.snapshot.managedStaticFields[c.from.index]));
+                        value.Add(new ObjectProxy(
+                            obj.snapshot, obj.snapshot.managedStaticFields[c.from.pair.index], c.from.field
+                        ));
                         break;
                 }
             }
@@ -453,17 +452,18 @@ namespace HeapExplorer
             Type,
             Name,
             Depth,
+            SourceField,
             Address,
         }
 
         public RootPathControl(HeapExplorerWindow window, string editorPrefsKey, TreeViewState state)
             : base(window, editorPrefsKey, state, new MultiColumnHeader(
-                new MultiColumnHeaderState(new[]
-                {
-                new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Type"), width = 200, autoResize = true },
-                new MultiColumnHeaderState.Column() { headerContent = new GUIContent("C++ Name"), width = 200, autoResize = true },
-                new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Depth"), width = 80, autoResize = true },
-                new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Address"), width = 200, autoResize = true },
+                new MultiColumnHeaderState(new[] {
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Type"), width = 200, autoResize = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent(COLUMN_CPP_NAME, COLUMN_CPP_NAME_DESCRIPTION), width = 200, autoResize = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Depth"), width = 80, autoResize = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent(COLUMN_SOURCE_FIELD, COLUMN_SOURCE_FIELD_DESCRIPTION), width = 200, autoResize = true },
+                    new MultiColumnHeaderState.Column() { headerContent = new GUIContent("Address"), width = 200, autoResize = true },
                 })))
         {
             columnIndexForTreeFoldouts = 0;
@@ -524,14 +524,16 @@ namespace HeapExplorer
                     var obj = path[n];
                     Item newItem = null;
 
-                    if (obj.native.isSome)
-                        newItem = AddNativeUnityObject(parent, obj.native.__unsafeGet.packed);
-                    else if (obj.managed.isSome)
-                        newItem = AddManagedObject(parent, obj.managed.__unsafeGet.packed);
-                    else if (obj.gcHandle.isSome)
-                        newItem = AddGCHandle(parent, obj.gcHandle.__unsafeGet.packed);
-                    else if (obj.staticField.isSome)
-                        newItem = AddStaticField(parent, obj.staticField.__unsafeGet.packed);
+                    {
+                        if (obj.native.valueOut(out var nativeObject))
+                            newItem = AddNativeUnityObject(parent, nativeObject.packed, obj.sourceField);
+                        else if (obj.managed.valueOut(out var managedObject))
+                            newItem = AddManagedObject(parent, managedObject.packed, obj.sourceField);
+                        else if (obj.gcHandle.valueOut(out var gcHandle))
+                            newItem = AddGCHandle(parent, gcHandle.packed, obj.sourceField);
+                        else if (obj.staticField.valueOut(out var staticField))
+                            newItem = AddStaticField(parent, staticField.packed, obj.sourceField);
+                    }
 
                     if (parent == root)
                     {
@@ -544,12 +546,13 @@ namespace HeapExplorer
             return root;
         }
 
-        Item AddGCHandle(TreeViewItem parent, PackedGCHandle gcHandle)
+        Item AddGCHandle(TreeViewItem parent, PackedGCHandle gcHandle, Option<PackedManagedField> field)
         {
             var item = new GCHandleItem
             {
                 id = m_UniqueId++,
                 depth = parent.depth + 1,
+                fieldName = field.fold("", _ => _.name)
             };
 
             item.Initialize(this, m_Snapshot, gcHandle.gcHandlesArrayIndex);
@@ -557,12 +560,13 @@ namespace HeapExplorer
             return item;
         }
 
-        Item AddManagedObject(TreeViewItem parent, PackedManagedObject managedObject)
+        Item AddManagedObject(TreeViewItem parent, PackedManagedObject managedObject, Option<PackedManagedField> field)
         {
             var item = new ManagedObjectItem
             {
                 id = m_UniqueId++,
                 depth = parent.depth + 1,
+                fieldName = field.fold("", _ => _.name)
             };
 
             item.Initialize(this, m_Snapshot, managedObject.managedObjectsArrayIndex);
@@ -570,12 +574,14 @@ namespace HeapExplorer
             return item;
         }
 
-        Item AddNativeUnityObject(TreeViewItem parent, PackedNativeUnityEngineObject nativeObject)
-        {
+        Item AddNativeUnityObject(
+            TreeViewItem parent, PackedNativeUnityEngineObject nativeObject, Option<PackedManagedField> field
+        ) {
             var item = new NativeObjectItem
             {
                 id = m_UniqueId++,
                 depth = parent.depth + 1,
+                fieldName = field.fold("", _ => _.name)
             };
 
             item.Initialize(this, m_Snapshot, nativeObject);
@@ -583,12 +589,13 @@ namespace HeapExplorer
             return item;
         }
 
-        Item AddStaticField(TreeViewItem parent, PackedManagedStaticField staticField)
+        Item AddStaticField(TreeViewItem parent, PackedManagedStaticField staticField, Option<PackedManagedField> field)
         {
             var item = new ManagedStaticFieldItem
             {
                 id = m_UniqueId++,
                 depth = parent.depth + 1,
+                fieldName = field.fold("", _ => _.name)
             };
 
             item.Initialize(this, m_Snapshot, staticField.staticFieldsArrayIndex);
@@ -607,6 +614,7 @@ namespace HeapExplorer
 
             protected RootPathControl m_Owner;
             protected string m_Value;
+            public string fieldName;
             protected System.UInt64 m_Address;
 
             public override void GetItemSearchString(string[] target, out int count, out string type, out string label)
@@ -649,6 +657,10 @@ namespace HeapExplorer
                             HeEditorGUI.Address(position, m_Address);
                         break;
 
+                    case Column.SourceField:
+                        EditorGUI.LabelField(position, fieldName);
+                        break;
+
                     case Column.Depth:
                         if (rootPath != null)
                             EditorGUI.LabelField(position, rootPath.count.ToString());
@@ -669,7 +681,7 @@ namespace HeapExplorer
                             for (var idx = 0; idx < count; idx++) {
                                 // Go backwards to mimic the view in Unity.
                                 var objectProxy = rootPath[count - idx - 1];
-                                text.AppendFormat("[{0}] {1}\n", idx, objectProxy);
+                                text.AppendFormat("[{0}] {1}\n\n", idx, objectProxy);
                             }
                             EditorGUIUtility.systemCopyBuffer = text.ToString();
                         }, rootPath);

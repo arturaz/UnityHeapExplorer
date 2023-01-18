@@ -59,6 +59,16 @@ namespace HeapExplorer.Utilities {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public B fold<B>(B ifNoValue, Func<A, B> ifHasValue) => 
       isSome ? ifHasValue(__unsafeGet) : ifNoValue;
+  
+    /// <summary>
+    /// <see cref="fold{B}"/> that allows to not allocate a closure.
+    /// </summary>
+    /// <example><code><![CDATA[
+    /// m_Value = m_GCHandle.managedObject.fold(data, "", (_, data) => _.type.computeName(data));
+    /// ]]></code></example>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public B fold<Data, B>(Data data, B ifNoValue, Func<A, Data, B> ifHasValue) => 
+      isSome ? ifHasValue(__unsafeGet, data) : ifNoValue;
     
     /// <summary>
     /// Runs the <see cref="mapper"/> if this is `Some` or else returns `None`.

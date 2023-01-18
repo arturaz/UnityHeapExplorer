@@ -12,8 +12,7 @@ namespace HeapExplorer
     /// </summary>
     [Serializable]
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
-    public struct PackedManagedField
-    {
+    public struct PackedManagedField {
         /// <summary>
         /// Offset of this field.
         /// </summary>
@@ -51,13 +50,16 @@ namespace HeapExplorer
             writer.Write(k_Version);
             writer.Write(value.Length);
 
-            for (int n = 0, nend = value.Length; n < nend; ++n)
-            {
-                writer.Write(value[n].name);
-                writer.Write(value[n].offset.asInt);
-                writer.Write(value[n].managedTypesArrayIndex.asInt);
-                writer.Write(value[n].isStatic);
+            for (int n = 0, nend = value.Length; n < nend; ++n) {
+                Write(writer, value[n]);
             }
+        }
+
+        public static void Write(System.IO.BinaryWriter writer, in PackedManagedField value) {
+            writer.Write(value.name);
+            writer.Write(value.offset.asInt);
+            writer.Write(value.managedTypesArrayIndex.asInt);
+            writer.Write(value.isStatic);
         }
 
         public static void Read(System.IO.BinaryReader reader, out PackedManagedField[] value)
@@ -70,20 +72,23 @@ namespace HeapExplorer
                 var length = reader.ReadInt32();
                 value = new PackedManagedField[length];
 
-                for (int n = 0, nend = value.Length; n < nend; ++n)
-                {
-                    var name = reader.ReadString();
-                    var offset = PInt.createOrThrow(reader.ReadInt32());
-                    var managedTypesArrayIndex = PInt.createOrThrow(reader.ReadInt32());
-                    var isStatic = reader.ReadBoolean();
-                    value[n] = new PackedManagedField(
-                        name: name,
-                        offset: offset,
-                        managedTypesArrayIndex: managedTypesArrayIndex,
-                        isStatic: isStatic
-                    );
+                for (int n = 0, nend = value.Length; n < nend; ++n) {
+                    value[n] = Read(reader);
                 }
             }
+        }
+
+        public static PackedManagedField Read(System.IO.BinaryReader reader) {
+            var name = reader.ReadString();
+            var offset = PInt.createOrThrow(reader.ReadInt32());
+            var managedTypesArrayIndex = PInt.createOrThrow(reader.ReadInt32());
+            var isStatic = reader.ReadBoolean();
+            return new PackedManagedField(
+                name: name,
+                offset: offset,
+                managedTypesArrayIndex: managedTypesArrayIndex,
+                isStatic: isStatic
+            );
         }
 
         public override string ToString()

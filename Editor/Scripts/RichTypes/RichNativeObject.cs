@@ -27,6 +27,12 @@ namespace HeapExplorer
             this.nativeObjectsArrayIndex = nativeObjectsArrayIndex;
         }
 
+        public override string ToString() =>
+            // We output the address with '0x' prefix to make it comfortable to copy and paste it into an exact search
+            // field.
+            $"Addr: 0x{address:X}, InstanceId: {instanceId}, Type: {type.name}, "
+            + $"GCHandle: {gcHandle}, ManagedObject: {managedObject}";
+
         public PackedNativeUnityEngineObject packed => snapshot.nativeObjects[nativeObjectsArrayIndex];
 
         public RichNativeType type => new RichNativeType(snapshot, packed.nativeTypesArrayIndex);

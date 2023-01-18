@@ -317,12 +317,15 @@ namespace HeapExplorer
             }
         }
 
-        // An enum derives from System.Enum, which derives from System.ValueType.
+        /// <summary>
+        /// <para/>
+        /// An enum derives from <see cref="System.Enum"/>, which derives from <see cref="System.ValueType"/>.
+        /// </summary>
         public bool isDerivedValueType
         {
             get
             {
-                if (!isValueType)
+                if (isReferenceType)
                     return false;
 
                 if (!this.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex))

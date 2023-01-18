@@ -2,6 +2,8 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
+
+using HeapExplorer.Utilities;
 using UnityEngine;
 using UnityEditor.IMGUI.Controls;
 using UnityEditor;
@@ -78,25 +80,29 @@ namespace HeapExplorer
         public void Inspect(PackedNativeUnityEngineObject item)
         {
             m_Selected = null;
-            ScheduleJob(new ObjectProxy(snapshot, item));
+            // TODO: add `sourceField` data
+            ScheduleJob(new ObjectProxy(snapshot, item, sourceField: None._));
         }
 
         public void Inspect(PackedManagedObject item)
         {
             m_Selected = null;
-            ScheduleJob(new ObjectProxy(snapshot, item));
+            // TODO: add `sourceField` data
+            ScheduleJob(new ObjectProxy(snapshot, item, sourceField: None._));
         }
 
         public void Inspect(PackedManagedStaticField item)
         {
             m_Selected = null;
-            ScheduleJob(new ObjectProxy(snapshot, item));
+            // TODO: add `sourceField` data
+            ScheduleJob(new ObjectProxy(snapshot, item, sourceField: None._));
         }
 
         public void Inspect(PackedGCHandle item)
         {
             m_Selected = null;
-            ScheduleJob(new ObjectProxy(snapshot, item));
+            // TODO: add `sourceField` data
+            ScheduleJob(new ObjectProxy(snapshot, item, sourceField: None._));
         }
 
         public void Clear()

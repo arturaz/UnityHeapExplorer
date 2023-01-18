@@ -24,18 +24,24 @@ namespace HeapExplorer
             managedStaticFieldsArrayIndex = staticFieldsArrayIndex;
         }
 
+        public override string ToString() =>
+            $"Name: {staticField.name}, In Type: {classType.name}, Of Type: {fieldType.name}";
+
         public PackedManagedStaticField packed => snapshot.managedStaticFields[managedStaticFieldsArrayIndex];
 
-        public RichManagedType fieldType
-        {
-            get
-            {
+        public PackedManagedField staticField {
+            get {
                 var mo = packed;
 
                 var staticClassType = snapshot.managedTypes[mo.managedTypesArrayIndex];
                 var staticField = staticClassType.fields[mo.fieldIndex];
-                var staticFieldType = snapshot.managedTypes[staticField.managedTypesArrayIndex];
+                return staticField;
+            }
+        }
 
+        public RichManagedType fieldType {
+            get {
+                var staticFieldType = snapshot.managedTypes[staticField.managedTypesArrayIndex];
                 return new RichManagedType(snapshot, staticFieldType.managedTypesArrayIndex);
             }
         }

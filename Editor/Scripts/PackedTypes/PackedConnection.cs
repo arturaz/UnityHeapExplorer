@@ -4,6 +4,7 @@
 //
 using System;
 using System.Collections.Generic;
+using HeapExplorer.Utilities;
 using UnityEngine;
 
 namespace HeapExplorer
@@ -34,7 +35,24 @@ namespace HeapExplorer
             /// <note>Static connections are NOT in the snapshot, we add them ourselves.</note>
             StaticField = 4,
         }
+
+        /// <summary>From part of the connection.</summary>
+        public readonly struct From {
+            public readonly Pair pair;
+            
+            /// <summary>
+            /// The field data for the reference, if the <see cref="Kind"/> is <see cref="Kind.Managed"/> or
+            /// <see cref="Kind.StaticField"/> (except for array types, for now). `None` otherwise.
+            /// </summary>
+            public readonly Option<PackedManagedField> field;
+
+            public From(Pair pair, Option<PackedManagedField> field) {
+                this.pair = pair;
+                this.field = field;
+            }
+        }
         
+        /// <summary>Named tuple.</summary>
         public readonly struct Pair {
             /// <summary>The connection kind, that is pointing to another object.</summary>
             public readonly Kind kind;
@@ -60,15 +78,18 @@ namespace HeapExplorer
             }
         }
 
+        /// <inheritdoc cref="From"/>
+        public readonly From from;
+        
         /// <inheritdoc cref="Pair"/>
-        public readonly Pair from, to;
+        public readonly Pair to;
 
-        public PackedConnection(Pair from, Pair to) {
+        public PackedConnection(From from, Pair to) {
             this.from = from;
             this.to = to;
         }
 
-        const int k_Version = 2;
+        const int k_Version = 3;
 
         public static void Write(System.IO.BinaryWriter writer, PackedConnection[] value)
         {
@@ -77,10 +98,14 @@ namespace HeapExplorer
 
             for (int n = 0, nend = value.Length; n < nend; ++n)
             {
-                writer.Write((byte)value[n].from.kind);
+                writer.Write((byte)value[n].from.pair.kind);
                 writer.Write((byte)value[n].to.kind);
-                writer.Write(value[n].from.index);
+                writer.Write(value[n].from.pair.index);
                 writer.Write(value[n].to.index);
+                writer.Write(value[n].from.field.isSome);
+                {if (value[n].from.field.valueOut(out var field)) {
+                    PackedManagedField.Write(writer, field);        
+                }}
             }
         }
 
@@ -108,8 +133,18 @@ namespace HeapExplorer
                     var toKind = (Kind)reader.ReadByte();
                     var fromIndex = reader.ReadInt32();
                     var toIndex = reader.ReadInt32();
+
+                    Option<PackedManagedField> field;
+                    if (version >= 3) {
+                        var hasField = reader.ReadBoolean();
+                        field = hasField ? Option.Some(PackedManagedField.Read(reader)) : None._;
+                    }
+                    else {
+                        field = None._;
+                    }
+                    
                     value[n] = new PackedConnection(
-                        from: new Pair(fromKind, fromIndex),
+                        from: new From(new Pair(fromKind, fromIndex), field),
                         to: new Pair(toKind, toIndex)
                     );
                 }
@@ -155,7 +190,7 @@ namespace HeapExplorer
                 }
 
                 var packed = new PackedConnection(
-                    from: new Pair(Kind.Native, n /* nativeObject index */),
+                    from: new From(new Pair(Kind.Native, n /* nativeObject index */), field: None._),
                     to: new Pair(Kind.GCHandle, nativeObjectsGCHandleIndices[n] /* gcHandle index */)
                 );
                 result.Add(packed);
@@ -204,7 +239,7 @@ namespace HeapExplorer
                 }
 
                 result.Add(new PackedConnection(
-                    from: new Pair(Kind.Native, fromIndex),
+                    from: new From(new Pair(Kind.Native, fromIndex), field: None._),
                     to: new Pair(Kind.Native, toIndex)
                 ));
             }

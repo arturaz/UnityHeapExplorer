@@ -36,25 +36,37 @@ namespace HeapExplorer
     [Serializable]
     public struct PackedVirtualMachineInformation
     {
-        // Size in bytes of a pointer.
+        /// <inheritdoc cref="PointerSize"/>
         public PointerSize pointerSize;
 
-        // Size in bytes of the header of each managed object.
+        /// <summary>
+        /// Size in bytes of the header of each managed object.
+        /// </summary>
         public PInt objectHeaderSize;
 
-        // Size in bytes of the header of an array object.
+        /// <summary>
+        /// Size in bytes of the header of an array object.
+        /// </summary>
         public PInt arrayHeaderSize;
 
-        // Offset in bytes inside the object header of an array object where the bounds of the array is stored.
+        /// <summary>
+        /// Offset in bytes inside the object header of an array object where the bounds of the array is stored.
+        /// </summary>
         public PInt arrayBoundsOffsetInHeader;
 
-        // Offset in bytes inside the object header of an array object where the size of the array is stored.
+        /// <summary>
+        /// Offset in bytes inside the object header of an array object where the size of the array is stored.
+        /// </summary>
         public PInt arraySizeOffsetInHeader;
 
-        // Allocation granularity in bytes used by the virtual machine allocator.
+        /// <summary>
+        /// Allocation granularity in bytes used by the virtual machine allocator.
+        /// </summary>
         public PInt allocationGranularity;
 
-        // A version number that will change when the object layout inside the managed heap will change.
+        /// <summary>
+        /// A version number that will change when the object layout inside the managed heap will change.
+        /// </summary>
         public System.Int32 heapFormatVersion;
 
         const System.Int32 k_Version = 1;

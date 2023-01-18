@@ -4,12 +4,14 @@
 //
 using System;
 
-namespace HeapExplorer
-{
+namespace HeapExplorer {
+    /// <summary>
+    /// Similar to <see cref="PackedManagedField"/> but can only represent static fields and thus has the
+    /// <see cref="staticFieldsArrayIndex"/> field.
+    /// </summary>
     [Serializable]
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
-    public readonly struct PackedManagedStaticField
-    {
+    public readonly struct PackedManagedStaticField {
         /// <summary>
         /// The index into <see cref="PackedMemorySnapshot.managedTypes"/> of the type this field belongs to.
         /// </summary>
