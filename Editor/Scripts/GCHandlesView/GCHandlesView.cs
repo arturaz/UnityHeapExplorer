@@ -4,6 +4,7 @@
 //
 using System.Collections;
 using System.Collections.Generic;
+using HeapExplorer.Utilities;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;

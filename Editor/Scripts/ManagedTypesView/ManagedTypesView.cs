@@ -4,6 +4,7 @@
 //
 using System.Collections;
 using System.Collections.Generic;
+using HeapExplorer.Utilities;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
@@ -14,7 +15,7 @@ namespace HeapExplorer
     {
         ManagedTypesControl m_TypesControl;
         HeSearchField m_TypesSearchField;
-        PackedManagedType? m_Selected;
+        Option<PackedManagedType> m_Selected;
         float m_SplitterHorz = 0.33333f;
         float m_SplitterVert = 0.32f;
 
@@ -80,14 +81,9 @@ namespace HeapExplorer
         //}
 
         // Called if the selection changed in the list that contains the managed objects overview.
-        void OnListViewSelectionChange(PackedManagedType? type)
+        void OnListViewSelectionChange(Option<PackedManagedType> type)
         {
             m_Selected = type;
-
-            if (!type.HasValue)
-            {
-                return;
-            }
         }
 
         public override void OnGUI()

@@ -4,6 +4,7 @@
 //
 using UnityEngine;
 using System;
+using HeapExplorer.Utilities;
 using UnityEditor.Profiling.Memory.Experimental;
 
 namespace HeapExplorer

@@ -4,59 +4,79 @@
 //
 using UnityEngine;
 using System;
+using System.Collections.Generic;
+using System.Linq;
+using HeapExplorer.Utilities;
 using UnityEditor.Profiling.Memory.Experimental;
-using static HeapExplorer.Option;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {
-    // Description of a managed type.
+    /// <summary>
+    /// Description of a managed type.
+    /// </summary>
+    /// <note>
+    /// This needs to be a class, not a struct because we cache <see cref="instanceFields"/> and
+    /// <see cref="staticFields"/>.
+    /// </note>
     [Serializable]
     [System.Runtime.InteropServices.StructLayout(System.Runtime.InteropServices.LayoutKind.Sequential, Pack = 1)]
-    public struct PackedManagedType : PackedMemorySnapshot.TypeForSubclassSearch
+    public class PackedManagedType : PackedMemorySnapshot.TypeForSubclassSearch
     {
         /// <summary>Is this type a value type? (if it's not a value type, it's a reference type)</summary>
-        public bool isValueType;
+        public readonly bool isValueType;
+
+        /// <summary>Is this type a reference type? (if it's not a reference type, it's a value type)</summary>
+        public bool isReferenceType => !isValueType;
 
         /// <summary>Is this type an array?</summary>
-        public bool isArray;
+        public readonly bool isArray;
 
         /// <summary>
         /// If this is an arrayType, this will return the rank of the array. (1 for a 1-dimensional array, 2 for a
         /// 2-dimensional array, etc)
         /// </summary>
-        public int arrayRank;
+        public readonly int arrayRank;
 
         /// <summary>
         /// Name of this type.
         /// </summary>
-        public string name;
+        public readonly string name;
 
         /// <summary>
         /// Name of the assembly this type was loaded from.
         /// </summary>
-        public string assembly;
+        public readonly string assembly;
 
         /// <summary>
         /// An array containing descriptions of all fields of this type.
         /// </summary>
-        public PackedManagedField[] fields;
+        public readonly PackedManagedField[] fields;
 
         /// <summary>
         /// The actual contents of the bytes that store this types static fields, at the point of time when the
         /// snapshot was taken.
         /// </summary>
-        public byte[] staticFieldBytes;
+        public readonly byte[] staticFieldBytes;
 
         /// <summary>
-        /// The base type for this type, pointed to by an index into <see cref="PackedMemorySnapshot.managedTypes"/>.
+        /// The base or element type for this type, pointed to by an index into <see cref="PackedMemorySnapshot.managedTypes"/>.
+        /// <para/>
+        /// ???: Not sure about this - this is either a reference to the base type or <see cref="managedTypesArrayIndex"/>?
+        /// But it is `None` when it's -1? WTF is going on here, Unity! 
         /// </summary>
-        public Option<int> baseOrElementTypeIndex;
+        public readonly Option<int> baseOrElementTypeIndex;
+
+        public Option<int> baseTypeIndex => 
+            baseOrElementTypeIndex.valueOut(out var idx)
+            ? idx == managedTypesArrayIndex ? None._ : Some(idx)
+            : None._;
 
         /// <summary>
         /// Size in bytes of an instance of this type. If this type is an array type, this describes the amount of
         /// bytes a single element in the array will take up.
         /// </summary>
-        public int size;
+        public readonly int size;
 
         /// <summary>
         /// The address in memory that contains the description of this type inside the virtual machine.
@@ -64,12 +84,12 @@ namespace HeapExplorer
         /// This can be used to match managed objects in the heap to their corresponding TypeDescription, as the first
         /// pointer of a managed object points to its type description.
         /// </summary>
-        public ulong typeInfoAddress;
+        public readonly ulong typeInfoAddress;
 
         /// <summary>
         /// This index is an index into the <see cref="PackedMemorySnapshot.managedTypes"/> array.
         /// </summary>
-        public int managedTypesArrayIndex;
+        public readonly int managedTypesArrayIndex;
 
         /// <summary>
         /// Index into <see cref="PackedMemorySnapshot.nativeTypes"/> if this managed type has a native counterpart or
@@ -107,6 +127,24 @@ namespace HeapExplorer
         /// </summary>
         [NonSerialized]
         public bool containsFieldOfReferenceTypeInInheritanceChain;
+
+        public PackedManagedType(
+            bool isValueType, bool isArray, int arrayRank, string name, string assembly, PackedManagedField[] fields, 
+            byte[] staticFieldBytes, Option<int> baseOrElementTypeIndex, int size, ulong typeInfoAddress, 
+            int managedTypesArrayIndex
+        ) {
+            this.isValueType = isValueType;
+            this.isArray = isArray;
+            this.arrayRank = arrayRank;
+            this.name = name;
+            this.assembly = assembly;
+            this.fields = fields;
+            this.staticFieldBytes = staticFieldBytes;
+            this.baseOrElementTypeIndex = baseOrElementTypeIndex;
+            this.size = size;
+            this.typeInfoAddress = typeInfoAddress;
+            this.managedTypesArrayIndex = managedTypesArrayIndex;
+        }
 
         /// <inheritdoc/>
         string PackedMemorySnapshot.TypeForSubclassSearch.name {
@@ -352,35 +390,51 @@ namespace HeapExplorer
 
                 for (int n = 0, nend = value.Length; n < nend; ++n)
                 {
-                    value[n].isValueType = reader.ReadBoolean();
-                    value[n].isArray = reader.ReadBoolean();
-                    value[n].arrayRank = reader.ReadInt32();
-                    value[n].name = reader.ReadString();
-                    value[n].assembly = reader.ReadString();
-
-                    var count = reader.ReadInt32();
-                    value[n].staticFieldBytes = reader.ReadBytes(count);
-                    var baseOrElementTypeIndex = reader.ReadInt32();
-                    value[n].baseOrElementTypeIndex = 
-                        baseOrElementTypeIndex == -1 ? None._ : Some(baseOrElementTypeIndex);
-                    value[n].size = reader.ReadInt32();
-                    value[n].typeInfoAddress = reader.ReadUInt64();
-                    value[n].managedTypesArrayIndex = reader.ReadInt32();
-
-                    PackedManagedField.Read(reader, out value[n].fields);
-
+                    var isValueType = reader.ReadBoolean();
+                    var isArray = reader.ReadBoolean();
+                    var arrayRank = reader.ReadInt32();
+                    
+                    var name = reader.ReadString();
                     // Types without namespace have a preceding period, which we remove here
                     // https://issuetracker.unity3d.com/issues/packedmemorysnapshot-leading-period-symbol-in-typename
-                    if (value[n].name != null && value[n].name.Length > 0 && value[n].name[0] == '.')
-                        value[n].name = value[n].name.Substring(1);
+                    if (name != null && name.Length > 0 && name[0] == '.')
+                        name = value[n].name.Substring(1);
+                    
+                    var assembly = reader.ReadString();
+
+                    var count = reader.ReadInt32();
+                    var staticFieldBytes = reader.ReadBytes(count);
+                    var rawBaseOrElementTypeIndex = reader.ReadInt32();
+                    var baseOrElementTypeIndex = 
+                        rawBaseOrElementTypeIndex == -1 ? None._ : Some(rawBaseOrElementTypeIndex);
+                    var size = reader.ReadInt32();
+                    var typeInfoAddress = reader.ReadUInt64();
+                    var managedTypesArrayIndex = reader.ReadInt32();
+
+                    PackedManagedField.Read(reader, out var fields);
+
+                    value[n] = new PackedManagedType(
+                        isValueType: isValueType,
+                        isArray: isArray,
+                        arrayRank: arrayRank,
+                        name: name,
+                        assembly: assembly,
+                        staticFieldBytes: staticFieldBytes,
+                        baseOrElementTypeIndex: baseOrElementTypeIndex,
+                        size: size,
+                        typeInfoAddress: typeInfoAddress,
+                        managedTypesArrayIndex: managedTypesArrayIndex,
+                        fields: fields
+                    );
                 }
             }
         }
 
-        public static PackedManagedType[] FromMemoryProfiler(UnityEditor.Profiling.Memory.Experimental.PackedMemorySnapshot snapshot)
-        {
+        public static PackedManagedType[] FromMemoryProfiler(
+            UnityEditor.Profiling.Memory.Experimental.PackedMemorySnapshot snapshot
+        ) {
             var source = snapshot.typeDescriptions;
-            var value = new PackedManagedType[source.GetNumEntries()];
+            var managedTypes = new PackedManagedType[source.GetNumEntries()];
 
             var sourceAssembly = new string[source.assembly.GetNumEntries()];
             source.assembly.GetEntries(0, source.assembly.GetNumEntries(), ref sourceAssembly);
@@ -424,51 +478,115 @@ namespace HeapExplorer
             var fieldTypeIndex = new int[desc.typeIndex.GetNumEntries()];
             desc.typeIndex.GetEntries(0, desc.typeIndex.GetNumEntries(), ref fieldTypeIndex);
 
-            var sourceFieldDescriptions = new PackedManagedField[desc.GetNumEntries()];
-            for (int n=0, nend = sourceFieldDescriptions.Length; n < nend; ++n) {
+            var sourceFieldDescriptions = new Option<PackedManagedField>[desc.GetNumEntries()];
+            for (int n=0, nend=sourceFieldDescriptions.Length; n < nend; ++n) {
                 var name = fieldName[n];
                 var isStatic = fieldStatic[n];
-                var offset = PInt.createOrThrow(fieldOffset[n]);
-                var managedTypesArrayIndex = PInt.createOrThrow(fieldTypeIndex[n]);
-                sourceFieldDescriptions[n] = new PackedManagedField(
-                    name: name, isStatic: isStatic, offset: offset, managedTypesArrayIndex: managedTypesArrayIndex
+                var rawOffset = fieldOffset[n];
+                var maybeOffset = PInt.create(rawOffset);
+                var rawManagedTypesArrayIndex = fieldTypeIndex[n];
+                var maybeManagedTypesArrayIndex = PInt.create(rawManagedTypesArrayIndex);
+
+                if (
+                    maybeOffset.valueOut(out var offset) 
+                    && maybeManagedTypesArrayIndex.valueOut(out var managedTypesArrayIndex)
+                ) {
+                    sourceFieldDescriptions[n] = Some(new PackedManagedField(
+                        name: name, isStatic: isStatic, offset: offset, managedTypesArrayIndex: managedTypesArrayIndex
+                    ));
+                }
+            }
+
+            // A cache for the temporary fields as we don't know how many of them are valid.
+            var fieldsList = new List<PackedManagedField>();
+            for (int n = 0, nend = managedTypes.Length; n < nend; ++n) {
+                var baseOrElementTypeIndex = sourceBaseOrElementTypeIndex[n];
+                var sourceFieldIndicesForValue = sourceFieldIndices[n];
+
+                // Assign fields.
+                fieldsList.Clear();
+                for (var j=0; j < sourceFieldIndicesForValue.Length; ++j) {
+                    var i = sourceFieldIndicesForValue[j];
+                    var maybeField = sourceFieldDescriptions[i];
+                    
+                    // Skip invalid fields.
+                    if (maybeField.valueOut(out var field)) {
+                        fieldsList.Add(new PackedManagedField(
+                            name: field.name,
+                            offset: field.offset,
+                            isStatic: field.isStatic,
+                            managedTypesArrayIndex: field.managedTypesArrayIndex
+                        ));
+                    }
+                }
+                var fields = fieldsList.ToArray();
+
+                var name = sourceName[n];
+                // namespace-less types have a preceding dot, which we remove here
+                if (name != null && name.Length > 0 && name[0] == '.') name = name.Substring(1);
+                
+                managedTypes[n] = new PackedManagedType(
+                    isValueType: (sourceFlags[n] & TypeFlags.kValueType) != 0,
+                    isArray: (sourceFlags[n] & TypeFlags.kArray) != 0,
+                    arrayRank: (int)(sourceFlags[n] & TypeFlags.kArrayRankMask)>>16,
+                    name: name,
+                    assembly: sourceAssembly[n],
+                    staticFieldBytes: sourceStaticFieldBytes[n],
+                    baseOrElementTypeIndex: baseOrElementTypeIndex == -1 ? None._ : Some(baseOrElementTypeIndex),
+                    size: sourceSize[n],
+                    typeInfoAddress: sourceTypeInfoAddress[n],
+                    managedTypesArrayIndex: sourceTypeIndex[n],
+                    fields: fields
                 );
             }
 
-            for (int n = 0, nend = value.Length; n < nend; ++n) {
-                var baseOrElementTypeIndex = sourceBaseOrElementTypeIndex[n];
-                value[n] = new PackedManagedType
-                {
-                    isValueType = (sourceFlags[n] & TypeFlags.kValueType) != 0,
-                    isArray = (sourceFlags[n] & TypeFlags.kArray) != 0,
-                    arrayRank = (int)(sourceFlags[n] & TypeFlags.kArrayRankMask)>>16,
-                    name = sourceName[n],
-                    assembly = sourceAssembly[n],
-                    staticFieldBytes = sourceStaticFieldBytes[n],
-                    baseOrElementTypeIndex = baseOrElementTypeIndex == -1 ? None._ : Some(baseOrElementTypeIndex),
-                    size = sourceSize[n],
-                    typeInfoAddress = sourceTypeInfoAddress[n],
-                    managedTypesArrayIndex = sourceTypeIndex[n],
-                    fields = new PackedManagedField[sourceFieldIndices[n].Length]
-                };
+            var importFailureIndexes = 
+                sourceFieldDescriptions
+                .Select((opt, idx) => (opt, idx))
+                .Where(tpl => tpl.opt.isNone)
+                .Select(tpl => tpl.idx)
+                .ToArray();
+            if (importFailureIndexes.Length > 0) {
+                // Offset will be -1 if the field is a static field with `[ThreadStatic]` attached to it.
+                bool isThreadStatic(int idx) => fieldStatic[idx] && fieldOffset[idx] == -1;
+                
+                var threadStatics = importFailureIndexes.Where(isThreadStatic).ToArray();
+                reportFailures(
+                    $"Detected following fields as [ThreadStatic] static fields. We do not know how to determine the "
+                    + $"memory location of these fields, thus we can not crawl them. Take that in mind.",
+                    threadStatics
+                );
+                var others = importFailureIndexes.Where(idx => !isThreadStatic(idx)).ToArray();
+                reportFailures(
+                    "Failed to import fields from the Unity memory snapshot due to invalid values, this seems "
+                    + "like a Unity bug", 
+                    others
+                );
 
-                for (var j=0; j< sourceFieldIndices[n].Length; ++j)
-                {
-                    var i = sourceFieldIndices[n][j];
-                    value[n].fields[j] = new PackedManagedField(
-                        name: sourceFieldDescriptions[i].name,
-                        offset: sourceFieldDescriptions[i].offset,
-                        isStatic: sourceFieldDescriptions[i].isStatic,
-                        managedTypesArrayIndex: sourceFieldDescriptions[i].managedTypesArrayIndex
-                    );
+                void reportFailures(string description, int[] failureIndexes) {
+                    if (failureIndexes.Length == 0) return;
+                
+                    // Group failures to not overwhelm Unity console window.
+                    var groupedFailures = failureIndexes.OrderBy(_ => _).groupedIn(PInt.createOrThrow(100)).ToArray();
+
+                    for (int idx = 0, idxEnd = groupedFailures.Length; idx < idxEnd; idx++) {
+                        var group = groupedFailures[idx];
+                        var str = string.Join("\n\n", group.Select(idx => {
+                            var managedTypesArrayIndex = fieldTypeIndex[idx];
+                            var typeName = managedTypes[managedTypesArrayIndex].name;
+                            var typeAssembly = managedTypes[managedTypesArrayIndex].assembly;
+                            return $"Field[index={idx}, name={fieldName[idx]}, static={fieldStatic[idx]}, "
+                                   + $"offset={fieldOffset[idx]}, managedTypesArrayIndex={managedTypesArrayIndex}"
+                                   + "]\n"
+                                   + $"@ [assembly '{typeAssembly}'] [type '{typeName}']";
+                        }));
+                    
+                        Debug.LogWarning($"{description}:\n{str}");
+                    }
                 }
-
-                // namespace-less types have a preceding dot, which we remove here
-                if (value[n].name != null && value[n].name.Length > 0 && value[n].name[0] == '.')
-                    value[n].name = value[n].name.Substring(1);
-
             }
-            return value;
+            
+            return managedTypes;
         }
 
         public override string ToString()
@@ -511,14 +629,17 @@ namespace HeapExplorer
         /// <summary>
         /// Gets whether any type in its inheritance chain has an instance field.
         /// </summary>
-        public static bool HasTypeOrBaseAnyField(PackedMemorySnapshot snapshot, PackedManagedType type, bool checkInstance, bool checkStatic)
-        {
-            var loopguard = 0;
+        public static bool HasTypeOrBaseAnyField(
+            PackedMemorySnapshot snapshot, PackedManagedType type, bool checkInstance, bool checkStatic
+        ) {
+            var cycleTracker = new CycleTracker<int>();
             do
             {
-                if (++loopguard > 64)
-                {
-                    Debug.LogError("loopguard kicked in");
+                if (cycleTracker.markIteration(type.managedTypesArrayIndex)) {
+                    cycleTracker.report(
+                        $"{nameof(HasTypeOrBaseAnyField)}()", type.managedTypesArrayIndex,
+                        idx => snapshot.managedTypes[idx].ToString()
+                    );
                     break;
                 }
 
@@ -563,16 +684,12 @@ namespace HeapExplorer
 
         public static bool HasTypeOrBaseAnyInstanceField(PackedMemorySnapshot snapshot, PackedManagedType type, out PackedManagedType fieldType)
         {
-            fieldType = new PackedManagedType {
-                managedTypesArrayIndex = -1
-            };
-
             var loopGuard = 0;
             do
             {
                 if (++loopGuard > 64)
                 {
-                    Debug.LogError("loopguard kicked in");
+                    Debug.LogError("HeapExplorer: loopguard kicked in");
                     break;
                 }
 
@@ -587,21 +704,18 @@ namespace HeapExplorer
 
             } while (type.baseOrElementTypeIndex.isSome && Some(type.managedTypesArrayIndex) != type.baseOrElementTypeIndex);
 
+            fieldType = default;
             return false;
         }
 
         public static bool HasTypeOrBaseAnyStaticField(PackedMemorySnapshot snapshot, PackedManagedType type, out PackedManagedType fieldType)
         {
-            fieldType = new PackedManagedType {
-                managedTypesArrayIndex = -1
-            };
-
             var loopGuard = 0;
             do
             {
                 if (++loopGuard > 64)
                 {
-                    Debug.LogError("loopguard kicked in");
+                    Debug.LogError("HeapExplorer: loopguard kicked in");
                     break;
                 }
 
@@ -611,11 +725,12 @@ namespace HeapExplorer
                     return true;
                 }
 
-                if (type.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex))
-                    type = snapshot.managedTypes[baseOrElementTypeIndex];
+                {if (type.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex))
+                    type = snapshot.managedTypes[baseOrElementTypeIndex];}
 
             } while (type.baseOrElementTypeIndex.isSome && Some(type.managedTypesArrayIndex) != type.baseOrElementTypeIndex);
 
+            fieldType = default;
             return false;
         }
     }

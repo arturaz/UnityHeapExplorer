@@ -4,7 +4,8 @@
 //
 
 using System;
-using static HeapExplorer.Option;
+using HeapExplorer.Utilities;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {
@@ -14,7 +15,7 @@ namespace HeapExplorer
     public readonly struct RichGCHandle
     {
         public readonly PackedMemorySnapshot snapshot;
-        public readonly int gcHandleArrayIndex;
+        public readonly int gcHandlesArrayIndex;
 
         public RichGCHandle(PackedMemorySnapshot snapshot, int gcHandlesArrayIndex) {
             if (gcHandlesArrayIndex >= snapshot.gcHandles.Length) {
@@ -24,10 +25,10 @@ namespace HeapExplorer
             }
             
             this.snapshot = snapshot;
-            gcHandleArrayIndex = gcHandlesArrayIndex;
+            this.gcHandlesArrayIndex = gcHandlesArrayIndex;
         }
 
-        public PackedGCHandle packed => snapshot.gcHandles[gcHandleArrayIndex];
+        public PackedGCHandle packed => snapshot.gcHandles[gcHandlesArrayIndex];
 
         public Option<RichManagedObject> managedObject =>
             packed.managedObjectsArrayIndex.valueOut(out var index)

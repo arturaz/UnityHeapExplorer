@@ -4,6 +4,8 @@
 //
 using UnityEngine;
 using System;
+using System.Collections.Generic;
+using HeapExplorer.Utilities;
 
 namespace HeapExplorer
 {
@@ -46,39 +48,55 @@ namespace HeapExplorer
         public PackedVirtualMachineInformation virtualMachineInformation;
 
         /// <summary>
+        /// Allows you to update the Unity progress bar with given <see cref="stepName"/>.
+        /// </summary>
+        public delegate void UpdateUnityUI(string stepName, int stepIndex, int totalSteps);
+        
+        /// <summary>
         /// Converts an Unity PackedMemorySnapshot to our own format.
         /// </summary>
-        public static PackedMemorySnapshot FromMemoryProfiler(MemorySnapshotProcessingArgs args)
-        {
+        public static PackedMemorySnapshot FromMemoryProfiler(
+            MemorySnapshotProcessingArgs args
+        ) {
             var source = args.source;
 
             var value = new PackedMemorySnapshot();
-            try
-            {
+            try {
+                const int TOTAL_STEPS = 9;
+                
+                args.maybeUpdateUI?.Invoke("Verifying memory profiler snapshot", 0, TOTAL_STEPS);
                 VerifyMemoryProfilerSnapshot(source);
 
                 value.busyString = "Loading Header";
+                args.maybeUpdateUI?.Invoke(value.busyString, 1, TOTAL_STEPS);
                 value.header = PackedMemorySnapshotHeader.FromMemoryProfiler();
 
                 value.busyString = $"Loading {source.nativeTypes.GetNumEntries()} Native Types";
+                args.maybeUpdateUI?.Invoke(value.busyString, 2, TOTAL_STEPS);
                 value.nativeTypes = PackedNativeType.FromMemoryProfiler(source);
 
                 value.busyString = $"Loading {source.nativeObjects.GetNumEntries()} Native Objects";
+                args.maybeUpdateUI?.Invoke(value.busyString, 3, TOTAL_STEPS);
                 value.nativeObjects = PackedNativeUnityEngineObject.FromMemoryProfiler(source);
 
                 value.busyString = $"Loading {source.gcHandles.GetNumEntries()} GC Handles";
+                args.maybeUpdateUI?.Invoke(value.busyString, 4, TOTAL_STEPS);
                 value.gcHandles = PackedGCHandle.FromMemoryProfiler(source);
 
                 value.busyString = $"Loading {source.connections.GetNumEntries()} Object Connections";
+                args.maybeUpdateUI?.Invoke(value.busyString, 5, TOTAL_STEPS);
                 value.connections = PackedConnection.FromMemoryProfiler(source);
 
                 value.busyString = $"Loading {source.managedHeapSections.GetNumEntries()} Managed Heap Sections";
+                args.maybeUpdateUI?.Invoke(value.busyString, 6, TOTAL_STEPS);
                 value.managedHeapSections = PackedMemorySection.FromMemoryProfiler(source);
 
                 value.busyString = $"Loading {source.typeDescriptions.GetNumEntries()} Managed Types";
+                args.maybeUpdateUI?.Invoke(value.busyString, 7, TOTAL_STEPS);
                 value.managedTypes = PackedManagedType.FromMemoryProfiler(source);
 
                 value.busyString = "Loading VM Information";
+                args.maybeUpdateUI?.Invoke(value.busyString, 8, TOTAL_STEPS);
                 value.virtualMachineInformation = PackedVirtualMachineInformation.FromMemoryProfiler(source);
             }
             catch (Exception e)
@@ -171,11 +189,74 @@ namespace HeapExplorer
                 }
             }
         }
+
+        /// <summary>
+        /// Cache for <see cref="isOrContainsReferenceType"/>
+        /// </summary>
+        Dictionary<int, bool> _containsReferenceTypeCache = new Dictionary<int, bool>();
+
+        /// <summary>
+        /// Returns true if the type index for <see cref="managedTypes"/> is a reference type or contains a reference
+        /// type as any of its fields. Value types are checked recursively, so this returns true for:
+        /// 
+        /// <code><![CDATA[
+        /// struct Foo {
+        ///   Bar bar;
+        /// }
+        ///
+        /// struct Bar {
+        ///   string str;
+        /// }
+        /// ]]></code> 
+        /// </summary>
+        /// TODO: test
+        public bool isOrContainsReferenceType(int managedTypeIndex) =>
+            _containsReferenceTypeCache.getOrUpdate(
+                managedTypeIndex, 
+                this, 
+                (managedTypeIndex, self) => {
+                    var type = self.managedTypes[managedTypeIndex];
+                    if (type.isReferenceType)
+                        return true;
+                    
+                    // Primitive types do not contain reference types in them, but contain self-references for structs,
+                    // making us go into recursion forever.
+                    if (type.isPrimitive)
+                        return false;
+
+                    var managedTypesLength = self.managedTypes.Length;
+                    var instanceFields = type.instanceFields;
+
+                    for (int n = 0, nend = instanceFields.Length; n < nend; ++n) {
+                        var fieldTypeIndex = instanceFields[n].managedTypesArrayIndex;
+                        if (fieldTypeIndex < 0 || fieldTypeIndex >= managedTypesLength) {
+                            self.Error(
+                                $"HeapExplorer: '{type.name}' field '{n}' is out of bounds '{fieldTypeIndex}', ignoring."
+                            );
+                            continue;
+                        }
+
+                        if (fieldTypeIndex == managedTypeIndex) {
+                            self.Error(
+                                $"HeapExplorer: '{type.name}' field '{instanceFields[n].name}' is a value type that "
+                                + "contains itself, that should be impossible!."
+                            );
+                            continue;
+                        }
+                        
+                        if (self.isOrContainsReferenceType(fieldTypeIndex))
+                            return true;
+                    }
+
+                    return false;
+                }
+            );
     }
 
     // Specifies how an Unity MemorySnapshot must be converted to HeapExplorer format.
     public class MemorySnapshotProcessingArgs
     {
         public UnityEditor.Profiling.Memory.Experimental.PackedMemorySnapshot source;
+        public PackedMemorySnapshot.UpdateUnityUI maybeUpdateUI;
     }
 }

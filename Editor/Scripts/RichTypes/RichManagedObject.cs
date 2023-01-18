@@ -4,7 +4,8 @@
 //
 
 using System;
-using static HeapExplorer.Option;
+using HeapExplorer.Utilities;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {
@@ -15,16 +16,20 @@ namespace HeapExplorer
     {
         public RichManagedObject(PackedMemorySnapshot snapshot, PackedManagedObject.ArrayIndex managedObjectsArrayIndex)
         {
+            if (managedObjectsArrayIndex.isStatic)
+                throw new ArgumentException(
+                    $"{managedObjectsArrayIndex} is static while we're trying to create a {nameof(RichManagedObject)}!"
+                );
             if (managedObjectsArrayIndex.index >= snapshot.managedObjects.Length) {
                 throw new ArgumentOutOfRangeException(
                     $"{managedObjectsArrayIndex} is out of bounds [0..{snapshot.managedObjects.Length})"
                 );
             }
             this.snapshot = snapshot;
-            managedObjectArrayIndex = managedObjectsArrayIndex;
+            this.managedObjectsArrayIndex = managedObjectsArrayIndex.index;
         }
 
-        public PackedManagedObject packed => snapshot.managedObjects[managedObjectArrayIndex.index];
+        public PackedManagedObject packed => snapshot.managedObjects[managedObjectsArrayIndex];
 
         public ulong address => packed.address;
 
@@ -48,6 +53,8 @@ namespace HeapExplorer
             $"Addr: 0x{address:X}, Type: {type.name}";
 
         public readonly PackedMemorySnapshot snapshot;
-        public readonly PackedManagedObject.ArrayIndex managedObjectArrayIndex;
+        
+        /// <summary>Index into <see cref="PackedMemorySnapshot.managedObjects"/>.</summary>
+        public readonly int managedObjectsArrayIndex;
     }
 }

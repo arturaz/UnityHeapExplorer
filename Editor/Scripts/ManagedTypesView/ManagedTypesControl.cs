@@ -2,17 +2,19 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
-using System.Collections;
-using System.Collections.Generic;
+
+using System;
+using HeapExplorer.Utilities;
 using UnityEngine;
 using UnityEditor.IMGUI.Controls;
 using UnityEditor;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {
     public class ManagedTypesControl : AbstractTreeView
     {
-        public System.Action<PackedManagedType?> onSelectionChange;
+        public Action<Option<PackedManagedType>> onSelectionChange;
 
         PackedMemorySnapshot m_Snapshot;
         int m_UniqueId = 1;
@@ -50,11 +52,11 @@ namespace HeapExplorer
             var item = selectedItem as ManagedTypeItem;
             if (item == null)
             {
-                onSelectionChange.Invoke(null);
+                onSelectionChange.Invoke(None._);
                 return;
             }
 
-            onSelectionChange.Invoke(item.packed);
+            onSelectionChange.Invoke(Some(item.packed));
         }
 
         public TreeViewItem BuildTree(PackedMemorySnapshot snapshot)
@@ -146,11 +148,11 @@ namespace HeapExplorer
             switch ((Column)sortingColumn)
             {
                 case Column.Name:
-                    return string.Compare(itemB.typeName, itemA.typeName, true);
+                    return string.Compare(itemB.typeName, itemA.typeName, StringComparison.OrdinalIgnoreCase);
                 case Column.ValueType:
                     return itemA.isValueType.CompareTo(itemB.isValueType);
                 case Column.AssemblyName:
-                    return string.Compare(itemB.assemblyName, itemA.assemblyName, true);
+                    return string.Compare(itemB.assemblyName, itemA.assemblyName, StringComparison.OrdinalIgnoreCase);
             }
 
             return 0;

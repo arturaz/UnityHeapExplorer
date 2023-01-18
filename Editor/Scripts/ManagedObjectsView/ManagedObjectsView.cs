@@ -3,10 +3,11 @@
 // https://github.com/pschraut/UnityHeapExplorer/
 //
 using System.Collections.Generic;
+using HeapExplorer.Utilities;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
-using static HeapExplorer.Option;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {

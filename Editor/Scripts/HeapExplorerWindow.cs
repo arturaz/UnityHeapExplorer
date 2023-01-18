@@ -822,15 +822,23 @@ namespace HeapExplorer
             }
         }
 
-        void OnHeapReceivedSaveOnly(string path, bool captureResult)
-        {
-            EditorUtility.DisplayProgressBar(HeGlobals.k_Title, "Saving memory...", 0.5f);
+        void OnHeapReceivedSaveOnly(string path, bool captureResult) {
+            const float BASE_PROGRESS = 0.5f;
+            const float PROGRESS_LEFT = 0.4f;
+            EditorUtility.DisplayProgressBar(HeGlobals.k_Title, "Saving memory...", BASE_PROGRESS);
             try
             {
-                var args = new MemorySnapshotProcessingArgs();
-                args.source = UnityEditor.Profiling.Memory.Experimental.PackedMemorySnapshot.Load(path);
+                var args = new MemorySnapshotProcessingArgs {
+                    source = UnityEditor.Profiling.Memory.Experimental.PackedMemorySnapshot.Load(path),
+                    maybeUpdateUI = (stepName, index, steps) => {
+                        var percentage = (float) index / (steps - 1);
+                        var totalPercentage = BASE_PROGRESS + percentage * PROGRESS_LEFT;
+                        EditorUtility.DisplayProgressBar(HeGlobals.k_Title, stepName, totalPercentage);
+                    }
+                };
 
                 var heap = PackedMemorySnapshot.FromMemoryProfiler(args);
+                EditorUtility.DisplayProgressBar(HeGlobals.k_Title, "Saving memory to file...", 0.95f);
                 heap.SaveToFile(autoSavePath);
                 HeMruFiles.AddPath(autoSavePath);
                 ShowNotification(new GUIContent($"Memory snapshot saved as\n'{autoSavePath}'"));
@@ -881,7 +889,7 @@ namespace HeapExplorer
                     {
                         threadFunc = ReceiveHeapThreaded,
                         snapshot = UnityEditor.Profiling.Memory.Experimental.PackedMemorySnapshot.Load(path)
-                };
+                    };
                     ScheduleJob(job);
                 }
                 else
@@ -902,8 +910,9 @@ namespace HeapExplorer
 
         void ReceiveHeapThreaded(object userData)
         {
-            var args = new MemorySnapshotProcessingArgs();
-            args.source = userData as UnityEditor.Profiling.Memory.Experimental.PackedMemorySnapshot;
+            var args = new MemorySnapshotProcessingArgs {
+                source = userData as UnityEditor.Profiling.Memory.Experimental.PackedMemorySnapshot
+            };
 
             try
             {

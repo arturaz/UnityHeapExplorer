@@ -3,10 +3,11 @@
 // https://github.com/pschraut/UnityHeapExplorer/
 //
 using System.Collections.Generic;
+using HeapExplorer.Utilities;
 using UnityEngine;
 using UnityEditor.IMGUI.Controls;
 using UnityEditor;
-using static HeapExplorer.Option;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {
@@ -165,9 +166,9 @@ namespace HeapExplorer
             }}
         }
 
-        void OnListViewTypeSelected(PackedManagedType? type)
+        void OnListViewTypeSelected(Option<PackedManagedType> maybeType)
         {
-            if (!type.HasValue)
+            if (!maybeType.valueOut(out var type))
             {
                 m_Selected = None._;
                 m_ConnectionsView.Clear();
@@ -175,7 +176,7 @@ namespace HeapExplorer
                 return;
             }
 
-            var selected = new RichManagedType(snapshot, type.Value.managedTypesArrayIndex);
+            var selected = new RichManagedType(snapshot, type.managedTypesArrayIndex);
             m_Selected = Some(selected);
             var staticClass = selected.packed;
             var staticFields = new List<PackedManagedStaticField>();

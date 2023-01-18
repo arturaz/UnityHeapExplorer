@@ -2,10 +2,12 @@
 // Heap Explorer for Unity. Copyright (c) 2019-2020 Peter Schraut (www.console-dev.de). See LICENSE.md
 // https://github.com/pschraut/UnityHeapExplorer/
 //
+
+using HeapExplorer.Utilities;
 using UnityEngine;
 using UnityEditor;
 using UnityEditor.IMGUI.Controls;
-using static HeapExplorer.Option;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {

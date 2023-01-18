@@ -3,7 +3,8 @@
 // https://github.com/pschraut/UnityHeapExplorer/
 //
 using System;
-using static HeapExplorer.Option;
+using HeapExplorer.Utilities;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {
@@ -88,8 +89,9 @@ namespace HeapExplorer
             }
         }
 
-        public static PackedNativeType[] FromMemoryProfiler(UnityEditor.Profiling.Memory.Experimental.PackedMemorySnapshot snapshot)
-        {
+        public static PackedNativeType[] FromMemoryProfiler(
+            UnityEditor.Profiling.Memory.Experimental.PackedMemorySnapshot snapshot
+        ) {
             var source = snapshot.nativeTypes;
             var value = new PackedNativeType[source.GetNumEntries()];
 

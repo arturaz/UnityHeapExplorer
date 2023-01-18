@@ -3,7 +3,8 @@
 // https://github.com/pschraut/UnityHeapExplorer/
 //
 using System;
-using static HeapExplorer.Option;
+using HeapExplorer.Utilities;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {

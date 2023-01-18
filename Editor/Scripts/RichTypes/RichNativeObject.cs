@@ -5,8 +5,9 @@
 
 using System;
 using System.Collections.Generic;
+using HeapExplorer.Utilities;
 using UnityEngine;
-using static HeapExplorer.Option;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {

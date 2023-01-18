@@ -12,6 +12,7 @@ using UnityEditor.IMGUI.Controls;
 using UnityEditor;
 using System.Reflection;
 using System.Threading;
+using HeapExplorer.Utilities;
 
 namespace HeapExplorer
 {

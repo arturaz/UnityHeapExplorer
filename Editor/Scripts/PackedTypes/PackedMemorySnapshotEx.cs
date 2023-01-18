@@ -11,7 +11,8 @@ using UnityEditor;
 using System;
 using System.Linq;
 using System.Threading;
-using static HeapExplorer.Option;
+using HeapExplorer.Utilities;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {
@@ -37,7 +38,7 @@ namespace HeapExplorer
         public PackedManagedStaticField[] managedStaticFields = new PackedManagedStaticField[0];
 
         /// <summary>
-        /// Indices into the managedTypes array of static types.
+        /// Indices into the <see cref="managedTypes"/> array of static types.
         /// </summary>
         [NonSerialized]
         public int[] managedStaticTypes = new int[0];
@@ -125,7 +126,9 @@ namespace HeapExplorer
         /// Find the managed object type at the specified address.
         /// </summary>
         /// <param name="address">The managed object memory address.</param>
-        /// <returns>An index into the snapshot.managedTypes array on success, `None` otherwise.</returns>
+        /// <returns>
+        /// An index into the <see cref="PackedMemorySnapshot.managedTypes"/> array on success, `None` otherwise.
+        /// </returns>
         public Option<int> FindManagedObjectTypeOfAddress(ulong address) {
             // IL2CPP has the class pointer as the first member of the object.
             {if (FindManagedTypeOfTypeInfoAddress(address).valueOut(out var il2cppAddress))
@@ -1128,9 +1131,9 @@ namespace HeapExplorer
                 abortActiveStepRequested = false;
 
                 busyString = "Finalizing";
-                System.Threading.Thread.Sleep(30);
+                Thread.Sleep(30);
             }
-            catch (System.Exception e)
+            catch (Exception e)
             {
                 Error(e.ToString());
                 throw;

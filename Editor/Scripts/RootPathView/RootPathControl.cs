@@ -8,7 +8,8 @@ using UnityEditor.IMGUI.Controls;
 using UnityEditor;
 using System.Linq;
 using System.Text;
-using static HeapExplorer.Option;
+using HeapExplorer.Utilities;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {
@@ -25,16 +26,16 @@ namespace HeapExplorer
             get
             {
                 if (native.isSome)
-                    return (1 << 62) + native.__unsafeGet.packed.nativeObjectsArrayIndex;
+                    return (1 << 62) + native.__unsafeGet.nativeObjectsArrayIndex;
 
                 if (managed.isSome)
-                    return (1 << 61) + managed.__unsafeGet.packed.managedObjectsArrayIndex.index;
+                    return (1 << 61) + managed.__unsafeGet.managedObjectsArrayIndex;
 
                 if (gcHandle.isSome)
-                    return (1 << 60) + gcHandle.__unsafeGet.packed.gcHandlesArrayIndex;
+                    return (1 << 60) + gcHandle.__unsafeGet.gcHandlesArrayIndex;
 
                 if (staticField.isSome)
-                    return (1 << 59) + staticField.__unsafeGet.packed.staticFieldsArrayIndex;
+                    return (1 << 59) + staticField.__unsafeGet.managedStaticFieldsArrayIndex;
 
                 return 0;
             }

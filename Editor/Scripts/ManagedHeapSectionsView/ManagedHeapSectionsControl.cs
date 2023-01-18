@@ -3,9 +3,11 @@
 // https://github.com/pschraut/UnityHeapExplorer/
 //
 //#define HEAPEXPLORER_DISPLAY_REFS
+
+using HeapExplorer.Utilities;
 using UnityEngine;
 using UnityEditor.IMGUI.Controls;
-using static HeapExplorer.Option;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {

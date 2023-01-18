@@ -3,7 +3,8 @@
 // https://github.com/pschraut/UnityHeapExplorer/
 //
 using System;
-using static HeapExplorer.Option;
+using HeapExplorer.Utilities;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {
@@ -61,7 +62,8 @@ namespace HeapExplorer
         public static void Write(System.IO.BinaryWriter writer, PackedVirtualMachineInformation value)
         {
             writer.Write(k_Version);
-            writer.Write(value.pointerSize.sizeInBytes());
+            // Convert to `int` for backwards compatibility with older snapshot versions.
+            writer.Write((int) value.pointerSize.sizeInBytes());
             writer.Write(value.objectHeaderSize);
             writer.Write(value.arrayHeaderSize);
             writer.Write(value.arrayBoundsOffsetInHeader);
@@ -76,9 +78,12 @@ namespace HeapExplorer
             stateString = "Loading VM Information";
 
             var version = reader.ReadInt32();
-            if (version >= 1)
-            {
-                value.pointerSize = PointerSize_.fromByteCount(reader.ReadInt32()).getOrThrow("unsupported pointer size");
+            if (version >= 1) {
+                var rawPointerSize = reader.ReadInt32();
+                if (!PointerSize_.fromByteCount(rawPointerSize).valueOut(out var pointerSize)) {
+                    throw new Exception($"unsupported pointer size: {rawPointerSize}");
+                }
+                value.pointerSize = pointerSize;
                 value.objectHeaderSize = PInt.createOrThrow(reader.ReadInt32());
                 value.arrayHeaderSize = PInt.createOrThrow(reader.ReadInt32());
                 value.arrayBoundsOffsetInHeader = PInt.createOrThrow(reader.ReadInt32());
@@ -92,9 +97,12 @@ namespace HeapExplorer
         {
             var source = snapshot.virtualMachineInformation;
 
+            if (!PointerSize_.fromByteCount(source.pointerSize).valueOut(out var pointerSize)) {
+                throw new Exception($"unsupported pointer size: {source.pointerSize}");
+            }
             var value = new PackedVirtualMachineInformation
             {
-                pointerSize = PointerSize_.fromByteCount(source.pointerSize).getOrThrow("unsupported pointer size"),
+                pointerSize = pointerSize,
                 objectHeaderSize = PInt.createOrThrow(source.objectHeaderSize),
                 arrayHeaderSize = PInt.createOrThrow(source.arrayHeaderSize),
                 arrayBoundsOffsetInHeader = PInt.createOrThrow(source.arrayBoundsOffsetInHeader),

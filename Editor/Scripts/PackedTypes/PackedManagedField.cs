@@ -3,6 +3,7 @@
 // https://github.com/pschraut/UnityHeapExplorer/
 //
 using System;
+using HeapExplorer.Utilities;
 
 namespace HeapExplorer
 {

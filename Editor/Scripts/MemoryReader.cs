@@ -4,8 +4,9 @@
 //
 
 using System.Globalization;
+using HeapExplorer.Utilities;
 using UnityEngine;
-using static HeapExplorer.Option;
+using static HeapExplorer.Utilities.Option;
 
 namespace HeapExplorer
 {
@@ -249,10 +250,10 @@ namespace HeapExplorer
 
         public Option<string> ReadString(ulong address)
         {
-            // strings differ from any other data type in the CLR (other than arrays) in that their size isn’t fixed.
-            // Normally the .NET GC knows the size of an object when it’s being allocated, because it’s based on the
-            // size of the fields/properties within the object and they don’t change. However in .NET a string object
-            // doesn’t contain a pointer to the actual string data, which is then stored elsewhere on the heap.
+            // strings differ from any other data type in the CLR (other than arrays) in that their size isnï¿½t fixed.
+            // Normally the .NET GC knows the size of an object when itï¿½s being allocated, because itï¿½s based on the
+            // size of the fields/properties within the object and they donï¿½t change. However in .NET a string object
+            // doesnï¿½t contain a pointer to the actual string data, which is then stored elsewhere on the heap.
             // That raw data, the actual bytes that make up the text are contained within the string object itself.
             // http://mattwarren.org/2016/05/31/Strings-and-the-CLR-a-Special-Relationship/
 
@@ -372,10 +373,9 @@ namespace HeapExplorer
             if (typeDescription.isArray)
             {
                 if (
-                    typeDescription.baseOrElementTypeIndex.isNone 
-                    || typeDescription.baseOrElementTypeIndex.getOrThrow() >= m_Snapshot.managedTypes.Length
-                )
-                {
+                    !typeDescription.baseOrElementTypeIndex.valueOut(out var baseOrElementTypeIndex) 
+                    || baseOrElementTypeIndex >= m_Snapshot.managedTypes.Length
+                ) {
                     var details = "";
                     details = "arrayRank=" + typeDescription.arrayRank + ", " +
                         "isArray=" + typeDescription.isArray + ", " +
@@ -389,7 +389,7 @@ namespace HeapExplorer
                 }
 
                 if (!ReadArrayLength(address, typeDescription).valueOut(out var arrayLength)) return None._;
-                var elementType = m_Snapshot.managedTypes[typeDescription.baseOrElementTypeIndex.getOrThrow()];
+                var elementType = m_Snapshot.managedTypes[baseOrElementTypeIndex];
                 var elementSize = elementType.isValueType ? elementType.size : m_Snapshot.virtualMachineInformation.pointerSize.sizeInBytes();
 
                 var size = m_Snapshot.virtualMachineInformation.arrayHeaderSize.asInt;
