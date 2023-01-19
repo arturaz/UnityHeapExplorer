@@ -555,8 +555,8 @@ namespace HeapExplorer
                 
                 var threadStatics = importFailureIndexes.Where(isThreadStatic).ToArray();
                 reportFailures(
-                    $"Detected following fields as [ThreadStatic] static fields. We do not know how to determine the "
-                    + $"memory location of these fields, thus we can not crawl them. Take that in mind.",
+                    "Detected following fields as [ThreadStatic] static fields. We do not know how to determine the "
+                    + $"memory location of these fields, thus we can not crawl them. Take that in mind",
                     threadStatics
                 );
                 var others = importFailureIndexes.Where(idx => !isThreadStatic(idx)).ToArray();
@@ -584,7 +584,7 @@ namespace HeapExplorer
                                    + $"@ [assembly '{typeAssembly}'] [type '{typeName}']";
                         }));
                     
-                        Debug.LogWarning($"{description}:\n{str}");
+                        Debug.LogWarning($"HeapExplorer: {description}:\n{str}");
                     }
                 }
             }
